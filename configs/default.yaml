@@ -1,0 +1,76 @@
+# VN-Rank default configuration.
+# Every tunable value lives here (AGENT.md 5.1). Values set to null are decisions that the
+# user takes in the phase noted next to them; code that needs them must refuse to run
+# while they are null.
+
+project:
+  seed: 42                      # global seed for deterministic components
+
+paths:
+  raw_dir: data/raw
+  interim_dir: data/interim
+  processed_dir: data/processed
+  reports_dir: reports
+  mlruns_dir: mlruns
+
+data:
+  source: vci                   # one adjusted-price source only; never mix vci and kbs
+  index_symbol: VNINDEX
+  exchanges: [HOSE, HNX, UPCOM] # exchange codes verified against vnstock in Phase 1
+  history_start: 2018-11-01     # requested start; Community tier caps history at ~8 years
+  request_interval_seconds: 3.2 # throttle for the ~20 requests/minute guest limit
+  max_retries: 5
+  retry_backoff_seconds: 30.0
+
+universe:
+  min_history_days: 252         # trading days of history required up to t
+  traded_value_window: 60       # window for the median traded value filter
+  min_traded_value_vnd: null    # Phase 2 decision; in VND (close is in thousand VND)
+
+label:
+  horizon_days: 5               # h: holding period in trading days
+  entry_lag_days: 1             # signal at close t, entry at close t+1
+  target: rank                  # rank (scaled to [0, 1]) or zscore, computed per date
+
+features:
+  return_windows: [1, 5, 20, 60, 120]
+  volatility_windows: [20, 60]
+  atr_window: 14
+  rsi_window: 14
+  macd_fast: 12
+  macd_slow: 26
+  macd_signal: 9
+  bollinger_window: 20
+  bollinger_num_std: 2.0
+  traded_value_window: 20
+  volume_ratio_window: 20
+  amihud_window: 20
+  high_window: 252
+
+validation:
+  train_start: 2019-11-01       # first date after the 252-day feature warm-up
+  walk_forward_start: 2022-01-01
+  walk_forward_end: 2025-09-30
+  lockbox_start: 2025-10-01     # evaluated once, in Phase 7, behind the lockbox guard
+  test_block_months: 6
+  inner_validation_months: 6    # tuning window = last months of each training window
+  embargo_days: 10              # trading days dropped after the purged train end
+
+models:
+  seeds: [0, 1, 2, 3, 4]        # seeds for stochastic models (MLP, bagged LightGBM)
+
+evaluation:
+  n_quantiles: 5                # quintile returns
+
+backtest:
+  top_quantile: 0.1             # long-only top decile, equal weight
+  costs:
+    brokerage_fee_per_side: null  # Phase 5 decision, fraction of traded value
+    selling_tax: 0.001            # 0.1% tax on the sell side
+    slippage_per_side: null       # Phase 5 decision, fraction of traded value
+  price_limits:                 # daily price band per exchange; verify current rules
+    HOSE: 0.07
+    HNX: 0.10
+    UPCOM: 0.15
+  position_cap_adv_window: 20
+  max_position_fraction_of_adv: null  # Phase 5 decision
