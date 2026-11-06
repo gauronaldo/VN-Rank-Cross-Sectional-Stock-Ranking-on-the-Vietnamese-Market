@@ -1,0 +1,25 @@
+# Local hooks reuse the pinned tools from the uv environment (no separate hook downloads).
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: uv run ruff check --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff format --check
+        entry: uv run ruff format --check --force-exclude
+        language: system
+        types_or: [python, pyi]
+      - id: mypy
+        name: mypy --strict (src)
+        entry: uv run mypy
+        language: system
+        pass_filenames: false
+        types: [python]
+      - id: no-data-files
+        name: refuse committing data or experiment artifacts
+        entry: "Data and experiment artifacts must not be committed"
+        language: fail
+        files: ^(data|mlruns|mlartifacts)/

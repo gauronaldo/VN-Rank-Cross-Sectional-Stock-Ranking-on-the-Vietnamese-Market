@@ -218,3 +218,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- VN-Rank project ---
+# Raw and processed market data must never be committed (vnstock license).
+/data/
+# MLflow experiment tracking artifacts.
+/mlruns/
+/mlartifacts/
