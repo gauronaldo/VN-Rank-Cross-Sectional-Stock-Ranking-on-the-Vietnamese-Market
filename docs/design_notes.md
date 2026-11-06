@@ -94,9 +94,34 @@ key is never committed or pasted anywhere.
   `route='reference.market.symbols_by_exchange'`, `requested_at`, `request_count`, and
   `robots_txt`. The VCI host reports
   `trading: User-agent *, Allow /, Crawl-delay 10`.
-- Price history is `Market().equity(symbol).ohlcv(...)` and
-  `Market().index("VNINDEX").ohlcv(...)`; `equity` and `index` are methods, not attributes.
-  The output schema of `ohlcv` is recorded after the second probe.
+- `Reference().equity.list_by_exchange()` exchange values: `UPCOM` 809, `HOSE` 408, `HNX` 299,
+  and **`DELISTED` 239**. Delisted symbols are therefore listed; whether their history can
+  be downloaded is checked by the third probe.
+- Price history is `Market().equity(symbol).ohlcv(start, end, interval="1D", *, limit,
+  source, count_back, length, floating=2)` and the same signature on
+  `Market().index("VNINDEX")`; `equity` and `index` are methods, not attributes.
+- `ohlcv` returns columns `time, open, high, low, close, volume` on a `RangeIndex`, with
+  `time` as `datetime64[ns, Asia/Ho_Chi_Minh]` stamped 07:00 local, prices `float64` in
+  thousand VND (FPT closed at 50.8 on 2026-11-06), and `volume` `int64`. There is no symbol
+  column.
+- **Default sources differ by asset class:** equities default to `vci`, but VNINDEX
+  defaults to `kbs`. The downloader always passes `source="vci"` explicitly.
+- **History cap:** FPT from 2015-01-01 returned 1,995 rows starting 2018-11-08, with a
+  warning and `attrs['cap_rows_dropped'] = 962` (`tier_cap_history_days = 2920`).
+- **VNINDEX returned only 1,000 rows** (from 2022-11-02) with either source; a longer
+  window is checked by the third probe.
+- **Rounding:** `floating=2` rounds prices to two decimals by default. Adjusted prices of
+  low-priced stocks lose precision, so the downloader passes `floating=None`.
+- **Batch calls do not help:** `Market().equity(["FPT", "VCB", "HPG"]).ohlcv(...)` made
+  3 requests (`attrs['request_count'] = 3`) and returned one stacked frame without a
+  symbol column, so symbols are downloaded one at a time.
+- `vnstock.usage()` reports the Community limits as 60/minute, 3,600/hour, 10,000/day,
+  and 100,000/month, with `history_days['daily'] = 2920`. A full download (about 1,760
+  requests) fits within one day.
+- Error classes: `RateLimitedError`, `AccessDeniedError`, and `CircuitOpenError` all
+  subclass `DataSourceBlockedError`, which subclasses `NetworkError` and `VnstockError`.
+  The downloader retries on `RateLimitedError` and network errors only.
+- Latency: a single call took 0.2 to 8 seconds.
 
 ## Rationale to complete in Phase 8
 
