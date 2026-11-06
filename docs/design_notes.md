@@ -15,10 +15,9 @@ are the newest versions that still support Python 3.11, which holds `numpy` at 2
 the virtual environment is about 6 GB. The project only needs the CPU build. The PyTorch CPU
 index was not reachable from the build environment, so the default wheel is used for now.
 
-**Type stubs.** `mypy --strict` runs on `src/`. PyYAML has no inline types. The stub package
-`types-PyYAML` is not on the allowed dependency list, so `yaml` is excluded from type
-checking in `pyproject.toml` until that is approved. `pandas-stubs` raises the same question
-once pandas code arrives in Phase 1.
+**Type stubs.** `mypy --strict` runs on `src/`. PyYAML and pandas ship no complete inline
+types, so the dev group adds `types-PyYAML` and `pandas-stubs`. They are type-checking aids
+only and never imported at runtime; added with the author's approval at the end of Phase 0.
 
 ## Configuration (Phase 0)
 
@@ -38,8 +37,8 @@ though prices are in thousand VND, so the conversion lives in exactly one place 
 
 **Module split.** The generic YAML-to-dataclass parser lives in
 `vn_rank/utils/dataclass_parsing.py`, which keeps `config.py` focused on the schema and its
-constraints. This file is not in the repository map in AGENT.md section 4; see the Phase 0
-report.
+constraints. This file is not in the repository map in AGENT.md section 4; the author
+approved the addition at the end of Phase 0.
 
 ## Lockbox guard (designed in Phase 0, implemented in Phases 3 and 7)
 

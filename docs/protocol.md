@@ -1,9 +1,8 @@
 # VN-Rank pre-registered research protocol
 
-**Status: DRAFT, pending user approval (Phase 0).** Once approved, this protocol is locked.
-Any later change must be added to the [Changelog](#11-changelog) with the date and the
-reason. Items marked **[proposed]** are choices that the spec leaves open; they become
-binding when the protocol is approved.
+**Status: LOCKED, approved by the author on 2026-11-06.** Any change must be added to the
+[Changelog](#11-changelog) with the date and the reason. Items marked **[proposed]** were
+choices the spec left open; they became binding when the protocol was approved.
 
 ## 1. Research question
 
@@ -164,3 +163,4 @@ Expressed in Rank IC; Sharpe is never a success criterion.
 | Date | Change | Reason |
 |---|---|---|
 | 2026-11-06 | Draft created. | Phase 0. |
+| 2026-11-06 | Approved and locked, including all [proposed] items. | End of Phase 0. |
