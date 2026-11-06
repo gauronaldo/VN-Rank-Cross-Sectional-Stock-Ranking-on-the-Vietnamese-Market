@@ -66,62 +66,13 @@ approved the addition at the end of Phase 0.
 5. **After the run.** No change to models, features, or parameters is allowed. Any later
    experiment is labelled exploratory in the README.
 
-## Data source (Phase 1)
+## Data source (Phase 0 finding, to be resolved in Phase 1)
 
-**Installation.** On 2026-11-06 the PyPI project `vnstock` was quarantined ("cannot be
-installed or modified until a security review is complete", since 2026-09-24). Generation 5
-is installed from the vendor's own index (`--extra-index-url https://vnstocks.com/api/packages`),
-which the cloud build environment cannot reach. The author therefore downloads data on their
-own machine. `vnstock` is not listed in `pyproject.toml` or `uv.lock`: it is installed into the
-project environment with `uv pip install`, and commands that need it run with
-`uv run --no-sync` so that uv does not remove it.
-
-**Account.** Community tier (free registration, API key stored by `vnstock register`).
-Published limits: Guest 20 requests/minute, Community 60 requests/minute (PyPI page). The
-key is never committed or pasted anywhere.
-
-**Verified against real outputs (probe run 2026-11-06, Windows 11, Python 3.12.3).**
-
-- `vnstock` 5.2.1 (core 0.7.2). `vnstock status` reports that this version works until
-  2027-10-27, so results must be reproducible from the stored snapshot, not from a
-  re-download.
-- Top-level API: `Reference`, `Market`, plus backward-compatible `Quote` and `Listing`
-  (`Quote` defaults to source `KBS`, so it is not used).
-- `Reference().equity.list_by_exchange(source=None)` (`None` means `vci`) returned 1,755 rows
-  with columns `symbol, exchange, organ_name, organ_short_name, icb_code_lv2`, all pandas
-  `string` dtype, on a `RangeIndex`. Exchange values seen include `HOSE` and `UPCOM`.
-- Every frame carries provenance in `df.attrs`, for example `source='vci'`,
-  `route='reference.market.symbols_by_exchange'`, `requested_at`, `request_count`, and
-  `robots_txt`. The VCI host reports
-  `trading: User-agent *, Allow /, Crawl-delay 10`.
-- `Reference().equity.list_by_exchange()` exchange values: `UPCOM` 809, `HOSE` 408, `HNX` 299,
-  and **`DELISTED` 239**. Delisted symbols are therefore listed; whether their history can
-  be downloaded is checked by the third probe.
-- Price history is `Market().equity(symbol).ohlcv(start, end, interval="1D", *, limit,
-  source, count_back, length, floating=2)` and the same signature on
-  `Market().index("VNINDEX")`; `equity` and `index` are methods, not attributes.
-- `ohlcv` returns columns `time, open, high, low, close, volume` on a `RangeIndex`, with
-  `time` as `datetime64[ns, Asia/Ho_Chi_Minh]` stamped 07:00 local, prices `float64` in
-  thousand VND (FPT closed at 50.8 on 2026-11-06), and `volume` `int64`. There is no symbol
-  column.
-- **Default sources differ by asset class:** equities default to `vci`, but VNINDEX
-  defaults to `kbs`. The downloader always passes `source="vci"` explicitly.
-- **History cap:** FPT from 2015-01-01 returned 1,995 rows starting 2018-11-08, with a
-  warning and `attrs['cap_rows_dropped'] = 962` (`tier_cap_history_days = 2920`).
-- **VNINDEX returned only 1,000 rows** (from 2022-11-02) with either source; a longer
-  window is checked by the third probe.
-- **Rounding:** `floating=2` rounds prices to two decimals by default. Adjusted prices of
-  low-priced stocks lose precision, so the downloader passes `floating=None`.
-- **Batch calls do not help:** `Market().equity(["FPT", "VCB", "HPG"]).ohlcv(...)` made
-  3 requests (`attrs['request_count'] = 3`) and returned one stacked frame without a
-  symbol column, so symbols are downloaded one at a time.
-- `vnstock.usage()` reports the Community limits as 60/minute, 3,600/hour, 10,000/day,
-  and 100,000/month, with `history_days['daily'] = 2920`. A full download (about 1,760
-  requests) fits within one day.
-- Error classes: `RateLimitedError`, `AccessDeniedError`, and `CircuitOpenError` all
-  subclass `DataSourceBlockedError`, which subclasses `NetworkError` and `VnstockError`.
-  The downloader retries on `RateLimitedError` and network errors only.
-- Latency: a single call took 0.2 to 8 seconds.
+On 2026-11-06 the PyPI project `vnstock` was quarantined ("cannot be installed or modified
+until a security review is complete", since 2026-09-24). The upstream GitHub README says
+generation 5 is distributed from the vendor's own package index on `vnstocks.com`, which
+this build environment cannot reach. `vnstock` is therefore not yet listed in
+`pyproject.toml`. The install route is decided with the user in Phase 1.
 
 ## Rationale to complete in Phase 8
 

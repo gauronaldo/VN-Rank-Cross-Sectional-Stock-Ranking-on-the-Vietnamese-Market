@@ -225,11 +225,3 @@ __marimo__/
 # MLflow experiment tracking artifacts.
 /mlruns/
 /mlartifacts/
-# One-off local probe of the vnstock API (Phase 1) and its outputs.
-/probe_vnstock.py
-/probe_output.txt
-/vnstock_status.txt
-/probe2_vnstock.py
-/probe2_output.txt
-/probe3_vnstock.py
-/probe3_output.txt
