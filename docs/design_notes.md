@@ -66,13 +66,37 @@ approved the addition at the end of Phase 0.
 5. **After the run.** No change to models, features, or parameters is allowed. Any later
    experiment is labelled exploratory in the README.
 
-## Data source (Phase 0 finding, to be resolved in Phase 1)
+## Data source (Phase 1)
 
-On 2026-11-06 the PyPI project `vnstock` was quarantined ("cannot be installed or modified
-until a security review is complete", since 2026-09-24). The upstream GitHub README says
-generation 5 is distributed from the vendor's own package index on `vnstocks.com`, which
-this build environment cannot reach. `vnstock` is therefore not yet listed in
-`pyproject.toml`. The install route is decided with the user in Phase 1.
+**Installation.** On 2026-11-06 the PyPI project `vnstock` was quarantined ("cannot be
+installed or modified until a security review is complete", since 2026-09-24). Generation 5
+is installed from the vendor's own index (`--extra-index-url https://vnstocks.com/api/packages`),
+which the cloud build environment cannot reach. The author therefore downloads data on their
+own machine. `vnstock` is not listed in `pyproject.toml` or `uv.lock`: it is installed into the
+project environment with `uv pip install`, and commands that need it run with
+`uv run --no-sync` so that uv does not remove it.
+
+**Account.** Community tier (free registration, API key stored by `vnstock register`).
+Published limits: Guest 20 requests/minute, Community 60 requests/minute (PyPI page). The
+key is never committed or pasted anywhere.
+
+**Verified against real outputs (probe run 2026-11-06, Windows 11, Python 3.12.3).**
+
+- `vnstock` 5.2.1 (core 0.7.2). `vnstock status` reports that this version works until
+  2027-10-27, so results must be reproducible from the stored snapshot, not from a
+  re-download.
+- Top-level API: `Reference`, `Market`, plus backward-compatible `Quote` and `Listing`
+  (`Quote` defaults to source `KBS`, so it is not used).
+- `Reference().equity.list_by_exchange(source=None)` (`None` means `vci`) returned 1,755 rows
+  with columns `symbol, exchange, organ_name, organ_short_name, icb_code_lv2`, all pandas
+  `string` dtype, on a `RangeIndex`. Exchange values seen include `HOSE` and `UPCOM`.
+- Every frame carries provenance in `df.attrs`, for example `source='vci'`,
+  `route='reference.market.symbols_by_exchange'`, `requested_at`, `request_count`, and
+  `robots_txt`. The VCI host reports
+  `trading: User-agent *, Allow /, Crawl-delay 10`.
+- Price history is `Market().equity(symbol).ohlcv(...)` and
+  `Market().index("VNINDEX").ohlcv(...)`; `equity` and `index` are methods, not attributes.
+  The output schema of `ohlcv` is recorded after the second probe.
 
 ## Rationale to complete in Phase 8
 

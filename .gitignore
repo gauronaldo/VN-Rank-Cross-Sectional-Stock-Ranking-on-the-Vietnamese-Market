@@ -229,3 +229,5 @@ __marimo__/
 /probe_vnstock.py
 /probe_output.txt
 /vnstock_status.txt
+/probe2_vnstock.py
+/probe2_output.txt
