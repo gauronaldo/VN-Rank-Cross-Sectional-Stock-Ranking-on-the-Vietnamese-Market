@@ -8,15 +8,15 @@ over the next 5 trading days. It does not forecast prices or call market directi
 is measured by **Rank IC** and by whether a simple long-only portfolio built from the
 ranking survives trading costs.
 
-**Status:** Phase 0 (scaffold and protocol) is complete and approved (2026-11-06).
-Phase 1 (data) is next. There are no results yet.
+**Status:** Phase 1 (data) is built and awaiting review (2026-11-07). There are no model
+results yet.
 
 ## Project status
 
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Scaffold, typed config, pre-registered protocol, lockbox guard design | **Done** |
-| 1 | Data: vnstock download, storage, validation, data-quality report | Next |
+| 1 | Data: vnstock download, storage, validation, data-quality report | **In review** |
 | 2 | Universe, features, labels | Not started |
 | 3 | Walk-forward splits, baselines, Elastic Net, LightGBM, Rank IC | Not started |
 | 4 | MLP (multi-seed) | Not started |
@@ -49,7 +49,22 @@ Phase 1 (data) is next. There are no results yet.
 - **Lockbox guard design.** See [`docs/design_notes.md`](docs/design_notes.md). It consists
   of a date guard on signal and label-exit dates, a development loader that truncates data
   before the lockbox, and a `--confirm-lockbox` command with a committed lock file.
-- **Tests.** 38 tests cover config parsing, validation, round-trips, and the CLI.
+- **Tests.** 38 tests cover config parsing, validation, round-trips, and the CLI
+  (71 after Phase 1).
+
+### Built in Phase 1 (awaiting approval)
+
+- **Snapshot.** vnstock 5.2.2, source `vci`, 2018-11-01 → 2026-11-06, downloaded
+  2026-11-07: 1,755 symbols listed (HOSE 408, HNX 299, UPCoM 809, delisted 239), of which
+  1,720 have data, 10 are empty, and 25 delisted symbols are unknown to `vci`; plus VNINDEX.
+  Delisted symbols are included to reduce survivorship bias (protocol changelog).
+- **Downloader.** `vn-rank download` is resumable (per-symbol manifest, fixed snapshot end
+  date), throttled to 1.2 s per request, and retries transient errors; resuming after an
+  interruption was verified on the real download.
+- **Data quality.** `vn-rank validate-data` writes
+  [`reports/data_quality.md`](reports/data_quality.md) and
+  [`reports/tickers_per_year.png`](reports/tickers_per_year.png). Nothing is dropped yet;
+  the treatment of flagged rows is decided at the end of Phase 1.
 
 ### Working agreements
 
@@ -86,7 +101,10 @@ _To be added after Phases 3–7._
 
 _To be completed. Known so far:_
 
-- survivorship bias, because the symbol list only contains currently listed stocks;
+- survivorship bias: delisted symbols are included, but symbols missing from the vendor
+  list (and 25 delisted symbols the source cannot serve) are not;
+- the exchange of each symbol is today's, so price bands are wrong before an exchange
+  transfer;
 - adjusted prices, which make historical traded value approximate;
 - short history, which gives wide confidence intervals on Sharpe.
 
@@ -96,6 +114,8 @@ _To be completed. Known so far:_
 make setup             # install pinned dependencies (uv) and git hooks
 make check             # lint + type-check + tests
 make validate-config   # load and validate configs/default.yaml
+make download          # vnstock snapshot into data/raw (Community API key required)
+make validate-data     # data-quality report and figure in reports/
 ```
 
 On Windows without `make`, run the underlying commands directly:
@@ -104,10 +124,16 @@ On Windows without `make`, run the underlying commands directly:
 uv sync
 uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest
 uv run vn-rank validate-config
+uv run vn-rank download
+uv run vn-rank validate-data
 ```
 
-Pipeline targets (`download`, `features`, `train`, `backtest`, `report`) are added in later
-phases.
+`vnstock` is installed from the vendor index (the `data` dependency group). Register a
+free Community API key once with `.venv\Scriptsnstock.exe register` (Windows) or
+`.venv/bin/vnstock register`. Without access to that index, `uv sync --no-group data`
+installs everything else.
+
+Pipeline targets (`features`, `train`, `backtest`, `report`) are added in later phases.
 
 ## Repository map
 
