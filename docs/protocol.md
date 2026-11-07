@@ -26,6 +26,17 @@ forecast price levels or market direction. Accuracy, RMSE, and MAPE are not used
 - The data is a snapshot. Download date, source, and vnstock version are recorded in
   metadata. Raw data is never committed.
 
+- **Data treatment** (decided after the Phase 1 quality report; applied when the processed
+  panel is built, raw files stay unchanged):
+  1. sessions with zero volume are kept, so windows count trading sessions, and their
+     `open`, `high`, and `low` are set to `close` (a no-trade bar);
+  2. on traded sessions, `high` is set to `max(open, high, low, close)` and `low` to the
+     minimum; non-positive `open`, `high`, or `low` are set to `close`; no row is dropped;
+  3. returns beyond the exchange price band are kept as they are, neither capped nor
+     dropped (most are new listings, first sessions after a suspension, or exchange
+     transfers);
+  4. symbols with no data (empty, or unknown to the source) are excluded.
+
 ## 3. Universe (point-in-time)
 
 A stock is eligible on trading date `t` if all of the following hold, using only information
@@ -168,3 +179,4 @@ Expressed in Rank IC; Sharpe is never a success criterion.
 | 2026-11-06 | Draft created. | Phase 0. |
 | 2026-11-06 | Approved and locked, including all [proposed] items. | End of Phase 0. |
 | 2026-11-07 | Include the 239 `DELISTED` symbols in the data and the universe; the price-limit check uses the widest band (UPCoM, ±15%) for them because their original exchange is unknown. | Phase 1 probe showed their history is available; including them reduces survivorship bias. Approved by the author. |
+| 2026-11-07 | Add the data-treatment rules in Section 2. | Decided by the author after the Phase 1 data-quality report, before any feature or label was built. |

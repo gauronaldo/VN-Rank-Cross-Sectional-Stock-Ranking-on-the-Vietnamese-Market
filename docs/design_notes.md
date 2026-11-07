@@ -123,6 +123,29 @@ orchestration in `data/download.py`, because together they exceeded the 250-line
 limit and they have different responsibilities (talking to the library versus resumable
 bookkeeping). This file is not in the AGENT.md repository map.
 
+## Data treatment (decided at the end of Phase 1)
+
+The rules are listed in `docs/protocol.md`, Section 2. The reasons:
+
+- **No-trade sessions (35% of rows).** The source emits a row for every session, even
+  without a trade: `open` is a stale earlier price, and `high`, `low`, and `close` are the
+  reference price. They explain 65,640 of the 67,391 OHLC-inconsistency flags. Keeping the
+  rows makes every window count sessions, so a 20-day return means 20 sessions for liquid
+  and illiquid stocks alike. Flattening the bar removes ranges that never traded, which
+  would otherwise inflate ATR. The universe already requires volume > 0 on day `t`. One
+  limitation remains: an exit day without a trade is valued at the reference price.
+- **OHLC repair instead of deletion.** Of the remaining inconsistencies, most are small
+  rounding effects of price adjustment, and `close` is valid in every case. Clipping
+  `high` and `low` keeps the close and the session calendar intact. After an illustrative
+  liquidity filter (1 billion VND) only 45 such rows and no zero-price rows remain.
+- **Band breaches are kept.** 18,496 rows exceed today's exchange band. Large caps have
+  none; the rest are mostly new listings, sessions after a suspension, and symbols that
+  moved exchange (the band is taken from today's exchange). Capping returns would distort
+  labels and features. After the same illustrative filter, 0.12% of rows are flagged. The
+  backtest price-limit constraint (Phase 5) inherits the today's-exchange limitation.
+- **Excluded symbols.** 25 delisted symbols unknown to `vci` and 10 empty ones; they are
+  listed in `reports/data_quality.md`.
+
 ## Rationale to complete in Phase 8
 
 - Why a 5-day horizon.
