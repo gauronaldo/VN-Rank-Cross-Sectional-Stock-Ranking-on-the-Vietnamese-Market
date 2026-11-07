@@ -101,9 +101,11 @@ python_version = "3.11"
 strict = true
 files = ["src"]
 
-# scikit-learn and shap ship no type information (no py.typed marker).
+# scikit-learn and shap ship no type information (no py.typed marker). vnstock is in the
+# optional `data` group (vendor index), so a checkout synced with `--no-group data`, such as
+# CI, must still type-check.
 [[tool.mypy.overrides]]
-module = ["sklearn.*", "shap.*"]
+module = ["sklearn.*", "shap.*", "vnstock", "vnstock.*"]
 ignore_missing_imports = true
 
 [tool.pytest.ini_options]

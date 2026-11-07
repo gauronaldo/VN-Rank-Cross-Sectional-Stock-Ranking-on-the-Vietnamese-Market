@@ -15,6 +15,12 @@ are the newest versions that still support Python 3.11, which holds `numpy` at 2
 the virtual environment is about 6 GB. The project only needs the CPU build. The PyTorch CPU
 index was not reachable from the build environment, so the default wheel is used for now.
 
+**Continuous integration.** `.github/workflows/check.yml` (outside the AGENT.md map,
+added after Phase 8) runs ruff, mypy, and pytest on every push. It uses a Windows runner
+because the locked PyTorch wheel is CPU-only there, while on Linux it pulls about 3 GB of
+CUDA libraries, and it syncs with `--no-group data`, so mypy ignores the missing vnstock
+import. A fresh clone from GitHub was checked the same way before CI was added.
+
 **Type stubs.** `mypy --strict` runs on `src/`. PyYAML and pandas ship no complete inline
 types, so the dev group adds `types-PyYAML` and `pandas-stubs`. They are type-checking aids
 only and never imported at runtime; added with the author's approval at the end of Phase 0.

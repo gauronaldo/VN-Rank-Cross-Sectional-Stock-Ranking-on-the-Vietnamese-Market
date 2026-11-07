@@ -1,0 +1,31 @@
+# Lint, type-check, and test on every push and pull request (the equivalent of `make check`).
+# Runs on Windows: the locked PyTorch wheel there is CPU-only, while on Linux it pulls about
+# 3 GB of CUDA libraries. vnstock (the `data` group, vendor index) is not installed; no test
+# needs it or any market data.
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.11.7"
+          enable-cache: true
+      - name: Install pinned dependencies (without the vnstock data group)
+        run: uv sync --locked --no-group data --python 3.11
+      - name: Ruff lint
+        run: uv run --no-sync ruff check .
+      - name: Ruff format
+        run: uv run --no-sync ruff format --check .
+      - name: Mypy (strict)
+        run: uv run --no-sync mypy
+      - name: Pytest
+        run: uv run --no-sync pytest
