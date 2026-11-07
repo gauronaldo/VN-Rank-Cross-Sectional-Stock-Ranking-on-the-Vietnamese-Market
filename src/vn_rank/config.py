@@ -175,6 +175,10 @@ class EvaluationConfig:
     n_quantiles: int
     tripwire_mean_ic: float
     tripwire_fold_ic: float
+    trading_days_per_year: int
+    bootstrap_block_days: int
+    bootstrap_resamples: int
+    confidence_level: float
 
 
 @dataclasses.dataclass(frozen=True)
@@ -191,6 +195,8 @@ class BacktestConfig:
     """Portfolio construction, costs, and trading constraints."""
 
     top_quantile: float
+    portfolio_value_vnd: float
+    limit_hit_margin: float
     costs: CostsConfig
     price_limits: dict[str, float]
     position_cap_adv_window: int
@@ -317,6 +323,10 @@ def _check_rates(universe: UniverseConfig, backtest: BacktestConfig) -> None:
     cap = backtest.max_position_fraction_of_adv
     _require(cap is None or 0 < cap <= 1, f"max_position_fraction_of_adv out of (0, 1]: {cap}")
     _require(0 < backtest.top_quantile <= 1, f"top_quantile out of (0, 1]: {backtest.top_quantile}")
+    _require(backtest.portfolio_value_vnd > 0, "portfolio_value_vnd must be > 0")
+    _require(
+        0 <= backtest.limit_hit_margin < min(backtest.price_limits.values()), "limit_hit_margin"
+    )
     threshold = universe.min_traded_value_vnd
     _require(threshold is None or threshold > 0, f"min_traded_value_vnd must be > 0: {threshold}")
 
@@ -326,6 +336,7 @@ def _check_misc(config: Config) -> None:
     _require(features.macd_fast < features.macd_slow, "macd_fast must be < macd_slow")
     _require(config.label.target in _TARGETS, f"label.target must be one of {_TARGETS}")
     _require(config.evaluation.n_quantiles >= _MIN_QUANTILES, "evaluation.n_quantiles must be >= 2")
+    _require(config.evaluation.confidence_level < 1, "confidence_level must be in (0, 1)")
     seeds = config.models.seeds
     _require(len(seeds) > 0 and len(set(seeds)) == len(seeds), "seeds must be non-empty, unique")
     _require(0 <= config.models.missing_rank_fill <= 1, "missing_rank_fill must be in [0, 1]")

@@ -102,17 +102,25 @@ evaluation:
   n_quantiles: 5                # quintile returns
   tripwire_mean_ic: 0.10        # leakage tripwire (protocol 9): walk-forward mean Rank IC above this
   tripwire_fold_ic: 0.20        # ... or any single fold above this stops work
+  trading_days_per_year: 252    # annualization (protocol 8)
+  bootstrap_block_days: 20      # moving-block bootstrap (protocol 8)
+  bootstrap_resamples: 10000
+  confidence_level: 0.95
 
+# Phase 5 defaults chosen under the author's standing approval (2026-11-07), checked against
+# 2025 broker data: large brokers' effective fee is about 0.16-0.17% (range 0.1-0.3%).
 backtest:
   top_quantile: 0.1             # long-only top decile, equal weight
+  portfolio_value_vnd: 10000000000.0  # 10 billion VND, sets the liquidity cap in VND
+  limit_hit_margin: 0.005       # a close within 0.5 pp of the band counts as limit-locked
   costs:
-    brokerage_fee_per_side: null  # Phase 5 decision, fraction of traded value
-    selling_tax: 0.001            # 0.1% tax on the sell side
-    slippage_per_side: null       # Phase 5 decision, fraction of traded value
-  price_limits:                 # daily price band per exchange; verify current rules
+    brokerage_fee_per_side: 0.0015  # 0.15% per side
+    selling_tax: 0.001              # 0.1% tax on the sell side
+    slippage_per_side: 0.001        # 0.10% per side (universe trades >= 1 bn VND per day)
+  price_limits:                 # daily band per exchange, verified for 2025 (HOSE 7%, HNX 10%, UPCoM 15%)
     HOSE: 0.07
     HNX: 0.10
     UPCOM: 0.15
     DELISTED: 0.15              # original exchange unknown; use the widest band
   position_cap_adv_window: 20
-  max_position_fraction_of_adv: null  # Phase 5 decision
+  max_position_fraction_of_adv: 0.1  # at most 10% of the 20-day average traded value per stock
