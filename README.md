@@ -3,203 +3,218 @@
 > **Research question:** can price–volume features rank Vietnamese stocks by 5-day forward
 > return, net of trading costs?
 
-VN-Rank produces a daily **ranking** of Vietnamese stocks by expected relative performance
-over the next 5 trading days. It does not forecast prices or call market direction. Success
-is measured by **Rank IC** and by whether a simple long-only portfolio built from the
-ranking survives trading costs.
+VN-Rank ranks the liquid Vietnamese stocks every day by expected relative performance
+over the next 5 trading days. It does not forecast prices or call market direction.
+Success is measured by **Rank IC** (defined below) under a pre-registered protocol, and by
+whether a long-only portfolio built from the ranking survives trading costs.
 
-**Status:** Phases 0–2 are approved. Phase 3 (walk-forward validation, baselines, Elastic
-Net, LightGBM) is built and awaiting review (2026-11-07). Signal-level walk-forward results
-are below; portfolio results come in Phase 5.
+## Answer in short
 
-## Project status
+- **The ranking is real.** The pre-registered primary model (LightGBM) has a walk-forward
+  mean Rank IC of **0.058** (95% block-bootstrap CI 0.042 to 0.076, positive in 8 of 8
+  folds) and **0.100** on the untouched lockbox year (CI 0.082 to 0.113). Both
+  pre-registered criteria hold: the outcome is **Supported**.
+- **It is not yet a profitable strategy.** Before costs the top decile beats the
+  equal-weight portfolio of the same universe by about 12% a year on walk-forward. But
+  the ranking changes fast (about 65% of the portfolio is replaced every week), so
+  realistic costs of about 0.6% per round trip take about 20% a year, and the net excess
+  return is **-6.4% a year** (CI -19% to +8%). In the lockbox year it is +6.6% a year,
+  but the CI again includes zero, and the absolute return is negative because the whole
+  universe fell.
+- **Where the signal comes from.** Mostly a low-volatility and liquidity tilt: the ATR
+  rank alone has a Rank IC of -0.061 on walk-forward and -0.104 on the lockbox. The
+  ranking is strongest at telling which stocks will do worst, which a long-only portfolio
+  in Vietnam (no short selling) cannot exploit.
 
-| Phase | Scope | State |
-|---|---|---|
-| 0 | Scaffold, typed config, pre-registered protocol, lockbox guard design | **Done** |
-| 1 | Data: vnstock download, storage, validation, data-quality report | **Done** |
-| 2 | Universe, features, labels | **Done** |
-| 3 | Walk-forward splits, baselines, Elastic Net, LightGBM, Rank IC | **In review** |
-| 4 | MLP (multi-seed) | Next |
-| 5 | Backtest net of costs, performance, bootstrap CIs | Not started |
-| 6 | Ablation, cost sensitivity, SHAP | Not started |
-| 7 | Lockbox (run once) and daily update command | Not started |
-| 8 | Showcase polish | Not started |
+## Data
 
-### Completed in Phase 0
+- `vnstock` 5.2.2, Community tier, source `vci` only: daily OHLCV adjusted for corporate
+  actions, in thousand VND, plus VNINDEX. Snapshot 2018-11-01 → 2026-11-06, downloaded
+  2026-11-07: 1,755 symbols (HOSE 408, HNX 299, UPCoM 809, delisted 239), of which 1,720
+  have data. See [`reports/data_quality.md`](reports/data_quality.md).
+- **Delisted symbols are included** to reduce survivorship bias, but symbols that left
+  the market before the vendor's list was compiled are still missing.
+  ![Tickers per year](reports/tickers_per_year.png)
+- Raw data is never committed (vnstock licence).
 
-- **Tooling.** `uv`-managed environment with exact dependency pins and a lockfile
-  (`requires-python >=3.11`, developed on 3.13). It runs `ruff` (lint and format),
-  `mypy --strict` on `src/`, `pytest`, and local `pre-commit` hooks, including one that
-  refuses to commit `data/` or `mlruns/`. `make check` runs all three checks.
-- **Package skeleton.** The package matches the repository map in `AGENT.md`; each module
-  documents the phase that implements it.
-- **Configuration.** Every tunable value lives in `configs/default.yaml`. It is parsed
-  strictly into frozen dataclasses (`src/vn_rank/config.py`,
-  `src/vn_rank/utils/dataclass_parsing.py`): unknown keys, missing keys, and wrong types are
-  errors. Semantic checks include `walk_forward_end < lockbox_start`. Values still to be
-  decided are `null`, and code that needs them must refuse to run while they are unset.
-  `vn-rank validate-config` loads and checks the file.
-- **Pre-registered protocol (locked).** See [`docs/protocol.md`](docs/protocol.md).
-  - The primary model is LightGBM, chosen before any result is seen.
-  - **C1:** the lower bound of the 95% block-bootstrap CI of the walk-forward mean Rank IC
-    is above 0.
-  - **C2:** the lockbox mean Rank IC is above 0.
-  - **Leakage tripwire:** a mean Rank IC above 0.10, or any single fold above 0.20, stops
-    work until leakage is investigated.
-- **Lockbox guard design.** See [`docs/design_notes.md`](docs/design_notes.md). It consists
-  of a date guard on signal and label-exit dates, a development loader that truncates data
-  before the lockbox, and a `--confirm-lockbox` command with a committed lock file.
-- **Tests.** 38 tests cover config parsing, validation, round-trips, and the CLI
-  (71 after Phase 1, 100 after Phase 2).
+## Protocol
 
-### Completed in Phase 1
+The full pre-registered protocol, locked on 2026-11-06 with a dated changelog, is in
+[`docs/protocol.md`](docs/protocol.md); the reason for every choice is in
+[`docs/design_notes.md`](docs/design_notes.md).
 
-- **Snapshot.** vnstock 5.2.2, source `vci`, 2018-11-01 → 2026-11-06, downloaded
-  2026-11-07: 1,755 symbols listed (HOSE 408, HNX 299, UPCoM 809, delisted 239), of which
-  1,720 have data, 10 are empty, and 25 delisted symbols are unknown to `vci`; plus VNINDEX.
-  Delisted symbols are included to reduce survivorship bias (protocol changelog).
-- **Downloader.** `vn-rank download` is resumable (per-symbol manifest, fixed snapshot end
-  date), throttled to 1.2 s per request, and retries transient errors; resuming after an
-  interruption was verified on the real download.
-- **Data quality.** `vn-rank validate-data` writes
-  [`reports/data_quality.md`](reports/data_quality.md) and
-  [`reports/tickers_per_year.png`](reports/tickers_per_year.png). Nothing is dropped yet;
-  the approved treatment of flagged rows is in `docs/protocol.md`, Section 2.
+| Item | Choice |
+|---|---|
+| Universe (point-in-time) | 252 sessions of history, 60-session median traded value ≥ 1 billion VND, traded on the day; about 320 stocks per day; dates with fewer than 50 stocks dropped |
+| Features | 15 hand-written price–volume features in 5 groups (momentum, volatility, technical, liquidity, price position), each ranked within its date |
+| Label | signal at the close of `t`, entry at the close of `t + 1`, exit 5 sessions later; target = per-date rank of the forward return |
+| Validation | 8 expanding walk-forward folds with half-year test blocks, 2022-01 → 2025-09; purge on the label exit date plus a 10-session embargo; tuning (Optuna) only on the last 6 months of each training window |
+| Lockbox | 2025-10-01 → 2026-10-29 (269 signal dates), evaluated **once** behind a guard and a committed lock file |
+| Models | 20-day momentum and 5-day reversal baselines, Elastic Net, **LightGBM (primary, chosen before any result)**, MLP; LightGBM and MLP averaged over 5 seeds |
+| Portfolio | long-only top decile (about 32 stocks), equal weight, rebalanced every 5 sessions; brokerage 0.15% and slippage 0.10% per side, 0.1% selling tax; no buying at limit-up, no selling at limit-down, positions capped at 10% of 20-day traded value for a 10 billion VND portfolio |
 
-### Completed in Phase 2
-
-- **Universe.** 252 sessions of history, a 60-session median traded value of at least
-  1 billion VND, and a trade on the day: about 320 stocks per session on 2022–2025 (154 in
-  late 2019, up to 480 in 2021).
-- **Features.** 15 hand-written price–volume features in 5 groups, each ranked within its
-  date; the forward 5-session return and its per-date rank as the target.
-- **Development panel.** `vn-rank features` loads prices before the lockbox only and
-  writes 449,922 rows (645 symbols, 2019-11-05 → 2025-09-30) with a column schema.
-- **Look-ahead test.** Rebuilding the panel on data cut at a date gives identical
-  features, ranks, and universe up to that date; injected leaks make it fail.
-- **EDA.** [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb): universe size, missingness,
-  feature distributions, and feature redundancy.
-
-### Built in Phase 3 (awaiting approval)
-
-- **Splits.** Eight expanding-window folds (half-year test blocks, 2022-01 → 2025-09).
-  Training labels that end on or after the block start are purged, 10 more sessions are
-  embargoed, and test labels that end in the lockbox are dropped. Dates with fewer than
-  50 eligible stocks are removed. The purge-alignment test checks every fold.
-- **Lockbox guard.** An explicit `raise` (not `assert`) on every split and every model
-  `fit`, which covers every tuning trial; tested.
-- **Models.** 20-day momentum and 5-day reversal baselines, Elastic Net, and LightGBM
-  (5 seeds). Optuna tunes Elastic Net and LightGBM inside each training window on the
-  last 6 months (30 trials per model per fold, 480 in total), scored by validation mean
-  Rank IC; every fold is logged to MLflow.
-- **Rank IC metrics.** Hand-written daily Rank IC, IC IR, Newey-West t-statistic, quintile
-  returns, and signal autocorrelation, tested against known answers and `statsmodels`.
-- **Reproducibility.** Two full runs produced identical predictions.
-
-### Working agreements
-
-- Commits go straight to `main`. Experimental work goes on a branch named after its
-  topic, for example `experiment/turnover-band`.
-- Market data is downloaded on the author's own machine, because `vnstock` generation 5
-  installs from the vendor's package index (the PyPI project is quarantined).
-- Decisions deferred to later phases: liquidity threshold (Phase 2); brokerage fee,
-  slippage, position cap, and top-N (Phase 5).
-
-## Protocol summary
-
-The full pre-registered protocol is in [`docs/protocol.md`](docs/protocol.md).
-
-- **Data:** `vnstock` Community tier, daily OHLCV adjusted for corporate actions (source
-  `vci`), about 8 years from 2018-11.
-- **Universe:** point-in-time. A stock needs 252 days of history, a 60-day median traded
-  value above a threshold, and a trade on the day.
-- **Label:** cross-sectional rank of the 5-day forward return. Entry is at the close after
-  the signal.
-- **Features:** 15 hand-implemented price–volume features, each ranked within its date.
-- **Liquidity threshold:** 1 billion VND (60-session median traded value).
-- **Validation:** expanding walk-forward over 2022-01 → 2025-09 with 6-month test blocks,
-  purge, and a 10-day embargo. The **lockbox** (2025-10 → latest) is evaluated once.
-- **Models:** momentum and reversal baselines, Elastic Net, LightGBM (primary), and an MLP.
-- **Metrics:** "IC" means **Rank IC**, the per-date Spearman correlation between predicted
-  scores and realized forward returns. Rank IC is primary. Portfolio Sharpe is secondary and
-  always reported with a confidence interval.
+**Pre-registered criteria (LightGBM only).** C1: the lower bound of the 95% CI of the
+walk-forward mean Rank IC is above 0. C2: the lockbox mean Rank IC is above 0. A leakage
+tripwire stops work if a walk-forward mean Rank IC exceeds 0.10 or a fold exceeds 0.20.
 
 ## Results
 
-### Signal level, walk-forward folds (Phase 3, preliminary)
+### Signal level: walk-forward (925 test dates)
 
-Rank IC is the per-date Spearman correlation between scores and 5-day forward returns,
-pooled over the 925 test dates of 2022-01 → 2025-09. IC IR is per day (not annualized);
-the t-statistic uses Newey-West standard errors with lag 4. LightGBM is the mean of 5
-seeds (seed standard deviation 0.0009). Full tables: [`reports/signal_results.md`](reports/signal_results.md).
+| Model | Mean Rank IC [95% CI] | IC IR | NW t | Folds > 0 | LightGBM minus model [95% CI] |
+|---|---|---|---|---|---|
+| Momentum (20 d) | -0.001 [-0.023, 0.026] | -0.003 | -0.05 | 4 / 8 | 0.059 [0.034, 0.080] |
+| Reversal (5 d) | 0.005 [-0.015, 0.023] | 0.026 | 0.49 | 5 / 8 | 0.054 [0.027, 0.084] |
+| Elastic Net | 0.040 [0.011, 0.069] | 0.197 | 3.26 | 6 / 8 | 0.018 [-0.001, 0.040] |
+| **LightGBM** | **0.058 [0.042, 0.076]** | **0.433** | **7.51** | **8 / 8** | — |
+| MLP | 0.057 [0.040, 0.075] | 0.392 | 6.85 | 8 / 8 | 0.002 [-0.006, 0.010] |
 
-| Model | Mean Rank IC | IC IR | NW t | Folds with positive IC |
-|---|---|---|---|---|
-| Momentum (20 d) | -0.0005 | -0.003 | -0.05 | 4 / 8 |
-| Reversal (5 d) | 0.0047 | 0.026 | 0.49 | 5 / 8 |
-| Elastic Net | 0.0402 | 0.197 | 3.26 | 6 / 8 |
-| **LightGBM** (primary) | **0.0584** | **0.433** | **7.51** | **8 / 8** |
+LightGBM beats both baselines clearly; its lead over Elastic Net and the MLP is not
+significant. The seed standard deviation of mean Rank IC is 0.0009 (LightGBM) and 0.0016
+(MLP). Per fold, LightGBM ranges from 0.011 (2023H1) to 0.101 (2024H1). Full tables:
+[`reports/signal_results.md`](reports/signal_results.md).
 
-The pre-registered criterion C1 (95% block-bootstrap CI of LightGBM's mean Rank IC above
-zero) is evaluated in Phase 5, when the bootstrap is built. Single features carry much of
-the signal: low volatility (ATR rank: Rank IC -0.061), liquidity, and closeness to the
-252-day high. Most of the quintile spread comes from the bottom quintile, which a
-long-only portfolio cannot short.
+### Portfolio level: walk-forward, net of costs
+
+| Strategy | Ann. return | Sharpe [95% CI] | Max DD | Turnover / yr | Cost / yr | Excess vs EW before costs | Excess vs EW after costs [95% CI] |
+|---|---|---|---|---|---|---|---|
+| LightGBM top decile | -12.6% | -0.54 [-1.47, 0.72] | -63% | 33.0x | 19.9% | +12.3% | -6.4% [-19.1%, +7.8%] |
+| LightGBM, turnover band* | -7.7% | -0.33 [-1.29, 0.98] | -61% | 24.5x | 14.8% | +12.2% | -1.5% [-14.2%, +12.9%] |
+| MLP top decile | -16.1% | -0.72 [-1.63, 0.55] | -64% | 33.2x | 20.0% | +9.0% | -9.9% [-21.9%, +4.1%] |
+| Momentum top decile | -11.0% | -0.39 [-1.36, 0.89] | -69% | 21.4x | 12.9% | +7.0% | -4.8% [-19.6%, +11.7%] |
+| Equal weight (same universe) | -6.2% | -0.24 [-1.30, 1.16] | -65% | 1.7x | 1.1% | — | — |
+| VNINDEX (no costs) | +4.2% | 0.22 [-0.78, 1.43] | -40% | — | — | — | — |
+
+\*Secondary variant (AGENT.md 3.7): keep a holding while it ranks in the top 20%, fill
+vacated slots from the top decile. It was added **after** seeing the walk-forward
+turnover; the band is the specification's value, not tuned.
+
+The test period starts at the top of the 2022 market: equal weight lost 55% in 2022
+(VNINDEX -34%). Per-year returns:
+[`reports/backtest_results.md`](reports/backtest_results.md).
+
+![Walk-forward equity curves](reports/equity_curves.png)
+
+### Lockbox (2025-10 → 2026-10, run once on 2026-11-07)
+
+| Model | Mean Rank IC [95% CI] | NW t | Excess vs EW after costs [95% CI] |
+|---|---|---|---|
+| **LightGBM** | **0.100 [0.082, 0.113]** | 9.43 | +6.6% [-3.8%, +16.8%] |
+| LightGBM, turnover band* | — | — | +10.8% [-0.2%, +22.4%] |
+| Elastic Net | 0.102 [0.072, 0.126] | 6.52 | +15.7% [+2.8%, +27.9%] |
+| MLP | 0.089 [0.072, 0.101] | 8.60 | +7.9% [-0.9%, +14.5%] |
+| Momentum / Reversal | 0.002 / 0.003 | 0.10 / 0.18 | -17.0% / -33.6% |
+
+Lockbox Rank IC is higher than walk-forward. Before reporting it, it was checked for
+leakage. The full panel reproduces the development panel exactly on development dates,
+the ATR rank alone (past prices only) reaches -0.104, a linear model matches LightGBM,
+and Rank IC is positive in all 13 months. The period favoured low-volatility stocks: the
+average stock fell (equal weight -22% a year) while large caps held VNINDEX at +4.7% a
+year. So every long-only portfolio here lost money in absolute terms, and the
+walk-forward 0.058 is the more representative estimate. Report:
+[`reports/lockbox_results.md`](reports/lockbox_results.md).
+
+### Ablation, sensitivity, and explanation
+
+- **Feature groups** (LightGBM rerun without each group, unchanged protocol): no group is
+  indispensable. The largest falls are without momentum (-0.005) and without technical
+  indicators (-0.004), and every paired CI includes zero. The features overlap heavily
+  (for example ATR, volatility, and Amihud illiquidity).
+- **Liquidity threshold:** Rank IC is 0.070 at 0.5, 0.058 at 1, 0.057 at 2, and 0.045 at
+  5 billion VND. The signal is strongest where trading is hardest. Net excess return is
+  negative at every threshold.
+- **Costs:** net excess return over equal weight breaks even at about 0.15% fee plus
+  slippage per side (about 0.4% per round trip with the tax); the default is 0.25%.
+- **SHAP** (last fold): high ATR, high 1-day return, and low Bollinger %B lower the
+  score; high 60-day return, MACD, and closeness to the 252-day high raise it.
+
+Tables: [`reports/ablation_results.md`](reports/ablation_results.md).
+
+![SHAP summary](reports/shap_summary.png)
+
+### Monitoring
+
+`vn-rank update` scores the newest session with the frozen lockbox model and tracks the
+realized Rank IC once labels mature:
+
+![Realized Rank IC](reports/realized_ic.png)
+
+## Metric definitions
+
+- **Rank IC ("IC" everywhere in this repository):** on one date, the Spearman correlation
+  between model scores and realized 5-day forward returns across the scored stocks. A
+  date on which a model gives every stock the same score counts as 0.
+- **Mean Rank IC, IC IR:** the mean of the daily Rank IC series over the test dates; IC IR
+  is mean / standard deviation, **per day, not annualized**.
+- **NW t:** t-statistic of the mean Rank IC with Newey-West (Bartlett) standard errors,
+  lag 4, because 5-day labels on consecutive days overlap.
+- **Confidence intervals:** 95% moving-block bootstrap (20-day blocks, 10,000 resamples)
+  of the daily series, percentile intervals; paired for differences.
+- **Returns and Sharpe:** daily net returns; annualized return = mean × 252, volatility =
+  standard deviation × √252, Sharpe = their ratio with a 0% risk-free rate. Turnover is
+  one-way (half the sum of absolute weight changes) per rebalance, × 252 / 5 per year.
+- For context only: public benchmarks on Chinese equities (Microsoft Qlib) report Rank IC
+  of about 0.02–0.05. They use a different market, label, and cost model and are **not
+  comparable**; they only show that a few hundredths is a normal result.
 
 ## Limitations
 
-_To be completed. Known so far:_
-
-- survivorship bias: delisted symbols are included, but symbols missing from the vendor
-  list (and 25 delisted symbols the source cannot serve) are not;
-- the exchange of each symbol is today's, so price bands are wrong before an exchange
-  transfer;
-- adjusted prices, which make historical traded value approximate;
-- short history, which gives wide confidence intervals on Sharpe.
+- **Survivorship bias** is reduced, not removed: 239 delisted symbols are included, but
+  25 of them cannot be served by the source and earlier delistings are absent. A stock
+  whose label is missing because it delisted inside the 5-day window is never selected,
+  and a delisted holding is carried at its last price.
+- **Adjusted prices:** historical traded values (used by the liquidity filter) are only
+  approximate, and refreshing data needs a complete new snapshot.
+- **Today's exchange for every date:** about 75 stocks moved exchange, so their price
+  band, and the limit-lock constraint, is wrong before the move.
+- **Short history:** about 3.75 years of walk-forward and 1 year of lockbox. The standard
+  error of an annualized Sharpe is about 0.6 and 1.2 respectively, which is why Sharpe is
+  secondary and every portfolio result carries a wide interval.
+- **Costs and execution are simplified:** trades at the close, a fixed slippage, a
+  limit-lock rule from the close-to-close return, and current fee and band rules.
+- **Choices made after seeing results** are labelled: the turnover-band variant (after the
+  walk-forward backtest) and the cost defaults (fixed before the backtest was run).
 
 ## Reproduction
 
 ```bash
-make setup             # install pinned dependencies (uv) and git hooks
-make check             # lint + type-check + tests
-make validate-config   # load and validate configs/default.yaml
+make setup             # pinned dependencies (uv) and git hooks
+make check             # ruff, mypy --strict, pytest (195 tests)
 make download          # vnstock snapshot into data/raw (Community API key required)
-make validate-data     # data-quality report and figure in reports/
-make features          # development panel in data/processed (prices before the lockbox)
-make train             # walk-forward tuning and scoring (about 8 minutes on 12 cores)
+make validate-data     # data-quality report and tickers-per-year figure
+make features          # development panel (prices before the lockbox), about 1 minute
+make train             # walk-forward tuning and scoring of 5 models, about 40 minutes
+make backtest          # portfolio backtest, about 1 minute
+make ablation          # feature groups, liquidity and cost sensitivity, SHAP, about 25 minutes
+make update            # score the newest session with the frozen model
 ```
 
-On Windows without `make`, run the underlying commands directly:
+`make lockbox` exists but refuses to run again: `reports/lockbox_run.lock` records the one
+run (commit `60375ba`). Every run is logged to MLflow (`mlruns/mlflow.db`; browse with
+`uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`). Configurations tried:
+720 Optuna trials in walk-forward, 1,920 in the ablation, and 90 for the lockbox model.
 
-```bash
-uv sync
-uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest
-uv run vn-rank validate-config
-uv run vn-rank download
-uv run vn-rank validate-data
-uv run vn-rank features
-uv run vn-rank train
-```
-
-`vnstock` is installed from the vendor index (the `data` dependency group). Register a
-free Community API key once with `.venv\Scriptsnstock.exe register` (Windows) or
-`.venv/bin/vnstock register`. Without access to that index, `uv sync --no-group data`
-installs everything else.
-
-`train` logs every fold to MLflow (`mlruns/mlflow.db`; browse with
-`uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`). Pipeline targets
-`backtest` and `report` are added in later phases.
+On Windows without `make`, run the commands directly, for example
+`uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest`
+and `uv run vn-rank train`. `vnstock` comes from the vendor index (the `data` dependency
+group); register a free Community key once with `vnstock register`. Without access to that
+index, `uv sync --no-group data` installs everything except the downloader.
 
 ## Repository map
 
 ```
 configs/default.yaml   every tunable value
-src/vn_rank/           package: data, features, validation, models, backtest, evaluation
-tests/                 mirrors src/
+src/vn_rank/
+  data/                download, storage, validation, universe
+  features/            indicators, ranks, labels, panel builder
+  validation/          purged walk-forward splits, lockbox guard, walk-forward runner
+  models/              baselines, Elastic Net, LightGBM, MLP, Optuna tuning
+  evaluation/          Rank IC, performance, block bootstrap
+  backtest/            costs, constraints, rebalance loop, runner
+  monitoring/          frozen-model scoring and realized Rank IC
+  cli.py, pipeline.py, ablation.py, final.py   command-line entry point and commands
+tests/                 mirrors src/ (look-ahead, purge, and cost-accounting tests included)
 docs/                  protocol.md (pre-registered), design_notes.md
-notebooks/             EDA and result plots only
-reports/               figures and tables used in this README
+notebooks/             EDA only
+reports/               the tables and figures used in this README
 ```
-
-Raw market data is never committed; see the vnstock licence.

@@ -3,7 +3,7 @@ CONFIG ?= configs/default.yaml
 UV := uv run
 
 .PHONY: help setup check lint format typecheck test validate-config \
-        download validate-data features train backtest report
+        download validate-data features train backtest ablation report lockbox update
 
 help:  ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -43,7 +43,16 @@ features:  ## Build the development panel (prices before lockbox_start) in data/
 train:  ## Tune, fit, and score all models on walk-forward folds (reports/signal_results.md)
 	$(UV) vn-rank --config $(CONFIG) train
 
-# Pipeline targets are implemented in later phases (AGENT.md section 7).
-backtest report:
-	@echo "'make $@' is not implemented yet; it is built in a later phase." >&2
-	@exit 1
+backtest:  ## Backtest walk-forward predictions net of costs (reports/backtest_results.md)
+	$(UV) vn-rank --config $(CONFIG) backtest
+
+ablation:  ## Feature-group ablation, liquidity and cost sensitivity, SHAP
+	$(UV) vn-rank --config $(CONFIG) ablation
+
+report: backtest ablation  ## Regenerate the portfolio and ablation reports from saved predictions
+
+lockbox:  ## One-time lockbox evaluation (refuses if reports/lockbox_run.lock exists)
+	$(UV) vn-rank --config $(CONFIG) lockbox --confirm-lockbox
+
+update:  ## Score the newest session with the frozen model; track realized Rank IC
+	$(UV) vn-rank --config $(CONFIG) update

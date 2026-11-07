@@ -309,9 +309,31 @@ Fetching new data means a complete fresh snapshot (`update --fetch`, into a date
 folder), because adjusted prices change with corporate actions and cannot be appended to
 an older snapshot.
 
-## Rationale to complete in Phase 8
+## Core rationale (Phase 8)
 
-- Why a 5-day horizon.
-- Why rank targets.
-- Why purge and embargo.
-- Why IC first and Sharpe second.
+**Why a 5-day horizon.** One trading week is long enough for price–volume effects
+(short-term reversal, volatility, liquidity) to show up above the daily noise and the
+T+2 settlement cycle, and short enough to give about 900 non-overlapping-ish walk-forward
+signal dates from under 4 years of data. The cost results show the price of this choice:
+weekly rebalancing of a fast-changing ranking costs about 20% a year at 0.6% per round
+trip, so a longer horizon or a turnover rule is the natural next experiment.
+
+**Why rank targets.** The question is about ordering stocks within a day, not predicting
+returns. Ranking the forward return per date removes the market's common move (which
+dominates raw returns, especially in 2022) and the heavy tails of single-stock returns,
+so an L2 loss on the rank target optimizes something close to Rank IC and no model is
+dominated by a few extreme days. Features are ranked the same way, so every model sees
+inputs on the same scale in every period.
+
+**Why purge and embargo.** A label uses prices up to `t + 6`, so with daily signals the
+training samples just before a test block overlap its first labels. Purging on the exit
+date removes that overlap exactly; the 10-session embargo adds a margin for serial
+correlation in features and returns. Without it, the last training labels would share
+returns with the first test labels and inflate test Rank IC.
+
+**Why Rank IC first and Sharpe second.** Rank IC is measured on about 300 stocks every
+day, so 925 test dates give a tight interval (0.042 to 0.076 for LightGBM). A portfolio
+Sharpe ratio is one number per path, its standard error over 3.75 years is about 0.6,
+and it mixes the signal with costs, constraints, and the market regime. The results show
+why both matter: the Rank IC is clearly positive, while the portfolio after costs is not
+distinguishable from the benchmark.
