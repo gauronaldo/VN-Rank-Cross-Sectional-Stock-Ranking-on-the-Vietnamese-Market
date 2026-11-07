@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from vn_rank import final, pipeline
+from vn_rank import exploratory, final, pipeline
 from vn_rank.config import Config, ConfigError, load_config
 from vn_rank.data import download, storage, validate
 from vn_rank.features import builder
@@ -53,6 +53,7 @@ def build_parser() -> argparse.ArgumentParser:
     lockbox.add_argument("--confirm-lockbox", action="store_true", help="Required to run.")
     update = commands.add_parser("update", help="Score the newest session with the frozen model.")
     update.add_argument("--fetch", action="store_true", help="Download a fresh snapshot first.")
+    commands.add_parser("exploratory", help="Low-volatility baselines vs LightGBM (exploratory).")
     return parser
 
 
@@ -82,6 +83,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "ablation": _ablation,
         "lockbox": lambda c: final.lockbox(c, args.confirm_lockbox),
         "update": lambda c: final.update(c, args.fetch),
+        "exploratory": exploratory.exploratory,
     }
     return handlers[args.command](config)
 

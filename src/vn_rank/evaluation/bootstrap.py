@@ -62,6 +62,37 @@ def bootstrap_ci(
     return float(low), float(high)
 
 
+def alpha_beta_ci(
+    strategy: np.ndarray, benchmark: np.ndarray, settings: BootstrapSettings, trading_days: int
+) -> dict[str, float]:
+    """Annualized alpha and beta of ``strategy`` on ``benchmark`` with a bootstrap CI.
+
+    Daily OLS ``strategy = a + b * benchmark``; alpha is ``a * trading_days``. Both series
+    are resampled with the same block indices, so their dependence is kept.
+
+    Returns:
+        ``alpha``, ``alpha_ci_low``, ``alpha_ci_high``, and ``beta``.
+
+    Raises:
+        ValueError: If the series differ in length, contain NaN, or are shorter than 2.
+    """
+    if len(strategy) != len(benchmark) or len(strategy) < 2:  # noqa: PLR2004
+        raise ValueError("alpha_beta_ci needs two series of the same length >= 2")
+    if np.isnan(strategy).any() or np.isnan(benchmark).any():
+        raise ValueError("alpha_beta_ci does not accept NaN")
+    rng = np.random.default_rng(settings.seed)
+    idx = block_indices(len(strategy), settings.block, settings.n_resamples, rng)
+    ys, xs = strategy[idx], benchmark[idx]
+    x_dev = xs - xs.mean(axis=1, keepdims=True)
+    betas = (x_dev * (ys - ys.mean(axis=1, keepdims=True))).sum(axis=1) / (x_dev**2).sum(axis=1)
+    alphas = (ys.mean(axis=1) - betas * xs.mean(axis=1)) * trading_days
+    beta = float(np.cov(strategy, benchmark)[0, 1] / np.var(benchmark, ddof=1))
+    tail = (1.0 - settings.level) / 2.0
+    low, high = np.quantile(alphas, [tail, 1.0 - tail])
+    alpha = float((strategy.mean() - beta * benchmark.mean()) * trading_days)
+    return {"alpha": alpha, "alpha_ci_low": float(low), "alpha_ci_high": float(high), "beta": beta}
+
+
 def mean_statistic(samples: np.ndarray) -> np.ndarray:
     """Row means (for mean Rank IC or a mean difference)."""
     return np.asarray(samples.mean(axis=1))

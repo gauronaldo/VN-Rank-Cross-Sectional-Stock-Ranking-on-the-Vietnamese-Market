@@ -3,7 +3,8 @@ CONFIG ?= configs/default.yaml
 UV := uv run
 
 .PHONY: help setup check lint format typecheck test validate-config \
-        download validate-data features train backtest ablation report lockbox update
+        download validate-data features train backtest ablation report lockbox update \
+        exploratory
 
 help:  ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -56,3 +57,6 @@ lockbox:  ## One-time lockbox evaluation (refuses if reports/lockbox_run.lock ex
 
 update:  ## Score the newest session with the frozen model; track realized Rank IC
 	$(UV) vn-rank --config $(CONFIG) update
+
+exploratory:  ## Post-lockbox low-volatility comparison (exploratory, changes no result)
+	$(UV) vn-rank --config $(CONFIG) exploratory
