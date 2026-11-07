@@ -149,6 +149,8 @@ class ModelsConfig:
     """Model-level settings shared by all models."""
 
     seeds: tuple[int, ...]
+    momentum_window: int
+    reversal_window: int
     missing_rank_fill: float
     elastic_net_max_iter: int
     lightgbm: LightGBMConfig
@@ -160,6 +162,8 @@ class EvaluationConfig:
     """Signal-evaluation settings."""
 
     n_quantiles: int
+    tripwire_mean_ic: float
+    tripwire_fold_ic: float
 
 
 @dataclasses.dataclass(frozen=True)
@@ -251,6 +255,7 @@ def validate_config(config: Config) -> None:
         config.label,
         config.features,
         config.validation,
+        config.evaluation,
         models.lightgbm,
         models.tuning,
     )
@@ -312,6 +317,8 @@ def _check_misc(config: Config) -> None:
     _require(len(seeds) > 0 and len(set(seeds)) == len(seeds), "seeds must be non-empty, unique")
     _require(0 <= config.models.missing_rank_fill <= 1, "missing_rank_fill must be in [0, 1]")
     _require(config.models.elastic_net_max_iter > 0, "elastic_net_max_iter must be > 0")
+    windows = (config.models.momentum_window, config.models.reversal_window)
+    _require(set(windows) <= set(features.return_windows), "baseline windows must be features")
     _require(
         set(config.backtest.price_limits) == set(data.exchanges),
         "backtest.price_limits keys must equal data.exchanges",

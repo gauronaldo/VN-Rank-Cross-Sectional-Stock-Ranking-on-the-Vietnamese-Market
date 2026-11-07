@@ -64,6 +64,8 @@ validation:
 
 models:
   seeds: [0, 1, 2, 3, 4]        # seeds for stochastic models (MLP, bagged LightGBM)
+  momentum_window: 20           # baseline: rank of the 20-day return
+  reversal_window: 5            # baseline: minus the rank of the 5-day return
   missing_rank_fill: 0.5        # Elastic Net only (median rank); LightGBM keeps NaN natively
   elastic_net_max_iter: 10000
   lightgbm:                     # fixed, not tuned
@@ -88,6 +90,8 @@ models:
 
 evaluation:
   n_quantiles: 5                # quintile returns
+  tripwire_mean_ic: 0.10        # leakage tripwire (protocol 9): walk-forward mean Rank IC above this
+  tripwire_fold_ic: 0.20        # ... or any single fold above this stops work
 
 backtest:
   top_quantile: 0.1             # long-only top decile, equal weight

@@ -91,6 +91,8 @@ def test_zero_embargo_is_allowed(raw_config: dict[str, Any]) -> None:
         ("models.seeds", [], "seeds"),
         ("evaluation.n_quantiles", 1, "n_quantiles"),
         ("models.missing_rank_fill", 1.5, "missing_rank_fill"),
+        ("models.momentum_window", 30, "baseline windows must be features"),
+        ("evaluation.tripwire_fold_ic", 0.0, "tripwire_fold_ic must be > 0"),
         ("models.tuning.n_trials", 0, "n_trials must be > 0"),
         ("models.lightgbm.learning_rate", 0.0, "learning_rate must be > 0"),
         ("models.tuning.lightgbm.lambda_l1.low", 20.0, "low must be < high"),
