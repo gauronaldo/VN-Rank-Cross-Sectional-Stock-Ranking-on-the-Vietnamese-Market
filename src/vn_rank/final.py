@@ -54,6 +54,7 @@ LIVE_DIR_NAME = "live"  # sibling of paths.processed_dir, i.e. data/live
 SCORES_LOG = "scores_log.parquet"
 REALIZED_FIGURE = "realized_ic.png"
 ROLLING_WINDOW = 20
+TRIALS_KEY = "optuna_trials"
 logger = logging.getLogger(__name__)
 
 
@@ -105,11 +106,16 @@ def lockbox_split(panel: pd.DataFrame, config: Config) -> tuple[pd.DataFrame, pd
 def final_models(
     train: pd.DataFrame, test: pd.DataFrame, config: Config
 ) -> tuple[pd.DataFrame, list[lgb.Booster], dict[str, dict[str, float]]]:
-    """Tune and refit every model on ``train``; score ``test``; keep LightGBM boosters."""
+    """Tune and refit every model on ``train``; score ``test``; keep LightGBM boosters.
+
+    The chosen parameters of each model also record ``optuna_trials``, the number of
+    tuning configurations tried for it.
+    """
     frames, boosters, chosen = [], [], {}
     for spec in walk_forward.model_specs(config):
-        params, _ = walk_forward.tune_spec(spec, train, config)
-        chosen[spec.name] = params
+        params, result = walk_forward.tune_spec(spec, train, config)
+        trials = 0.0 if result is None else float(len(result.trials))
+        chosen[spec.name] = {**params, TRIALS_KEY: trials}
         for seed in spec.seeds:
             model = spec.factory(params, seed).fit(train)
             frames.append(
@@ -201,7 +207,8 @@ def _report_lockbox(
         "",
         f"{pipeline.provenance(info, 'lockbox --confirm-lockbox')}",
         f"Signal dates {dates.min().date()} to {dates.max().date()} ({dates.nunique()} dates);"
-        f" models trained on {n_train} development samples with walk-forward tuning.",
+        f" models trained on {n_train} development samples with walk-forward tuning"
+        f" ({sum(p[TRIALS_KEY] for p in chosen.values()):.0f} Optuna configurations tried).",
         "",
         "## Pre-registered criteria (LightGBM)",
         "",
