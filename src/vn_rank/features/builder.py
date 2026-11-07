@@ -200,3 +200,29 @@ def _to_long(columns: dict[str, pd.DataFrame], mask: pd.DataFrame) -> pd.DataFra
     data = {name: frame.to_numpy()[rows, cols] for name, frame in columns.items()}
     keys = {"date": mask.index[rows], "symbol": mask.columns[cols].astype(str)}
     return pd.DataFrame({**keys, **data})
+
+
+_FIXED_COLUMNS = {
+    "date": "signal session t (close of t)",
+    "symbol": "ticker",
+    "exchange": "exchange code reported today (not the historical exchange)",
+    "entry_date": "entry session t + entry_lag (close)",
+    "exit_date": "exit session t + entry_lag + h (close); purge on this date",
+    "close": "adjusted close on t, thousand VND",
+    "median_traded_value": "median close x 1000 x volume over the universe window, VND",
+    "forward_return": "close[exit] / close[entry] - 1; label, never a feature",
+    "target": "per-date rank (or z-score) of forward_return among universe members",
+}
+
+
+def describe_columns(rule: FeaturesConfig) -> dict[str, str]:
+    """Return a one-line description of every panel column, in panel order."""
+    raw = {
+        name: f"raw feature, group {group}"
+        for group, names in feature_groups(rule).items()
+        for name in names
+    }
+    ranks = {RANK_PREFIX + n: f"per-date rank in [0, 1] of {n} among universe members" for n in raw}
+    fixed = dict(_FIXED_COLUMNS)
+    labels_part = {k: fixed.pop(k) for k in ("forward_return", "target")}
+    return {**fixed, **raw, **ranks, **labels_part}

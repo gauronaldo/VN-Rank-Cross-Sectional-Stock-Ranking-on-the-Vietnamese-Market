@@ -3,7 +3,7 @@ CONFIG ?= configs/default.yaml
 UV := uv run
 
 .PHONY: help setup check lint format typecheck test validate-config \
-        download features train backtest report
+        download validate-data features train backtest report
 
 help:  ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -37,7 +37,10 @@ download:  ## Download or resume the raw vnstock snapshot (needs a Community API
 validate-data:  ## Data-quality report and tickers-per-year figure
 	$(UV) vn-rank --config $(CONFIG) validate-data
 
+features:  ## Build the development panel (prices before lockbox_start) in data/processed
+	$(UV) vn-rank --config $(CONFIG) features
+
 # Pipeline targets are implemented in later phases (AGENT.md section 7).
-features train backtest report:
+train backtest report:
 	@echo "'make $@' is not implemented yet; it is built in a later phase." >&2
 	@exit 1

@@ -139,3 +139,8 @@ def test_labels_change_only_through_future_prices(config: Config) -> None:
         base.loc[before, "forward_return"].dropna().tail(20),
         moved.loc[before, "forward_return"].dropna().tail(20),
     )
+
+
+def test_describe_columns_matches_panel_columns(config: Config) -> None:
+    panel = builder.build_panel(synthetic_raw_panel(), CALENDAR, EXCHANGE, config)
+    assert list(builder.describe_columns(config.features)) == list(panel.columns)

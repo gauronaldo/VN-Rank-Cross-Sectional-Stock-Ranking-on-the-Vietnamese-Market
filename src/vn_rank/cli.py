@@ -17,6 +17,7 @@ import pandas as pd
 
 from vn_rank.config import Config, ConfigError, load_config
 from vn_rank.data import download, storage, validate
+from vn_rank.features import builder
 from vn_rank.utils.logging import configure_logging
 
 DEFAULT_CONFIG_PATH = Path("configs/default.yaml")
@@ -25,6 +26,8 @@ TICKERS_FIGURE_FILE = "tickers_per_year.png"
 QUALITY_FLAGS_FILE = "quality_flags.parquet"
 COVERAGE_FILE = "coverage.parquet"
 REPORT_TOP_N = 15
+PANEL_FILE = "panel.parquet"
+SCHEMA_FILE = "schema.json"
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +44,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser("validate-config", help="Load and validate the configuration.")
     commands.add_parser("download", help="Download or resume the raw vnstock snapshot.")
     commands.add_parser("validate-data", help="Run data-quality checks on the raw snapshot.")
+    commands.add_parser("features", help="Build the development panel (before the lockbox).")
     return parser
 
 
@@ -64,6 +68,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "validate-config": _validate_config,
         "download": _download,
         "validate-data": _validate_data,
+        "features": _features,
     }
     return handlers[args.command](config)
 
@@ -120,6 +125,35 @@ def _validate_data(config: Config) -> int:
     storage.write_parquet(report.flags, paths.interim_dir / QUALITY_FLAGS_FILE)
     storage.write_parquet(report.coverage.reset_index(), paths.interim_dir / COVERAGE_FILE)
     logger.info("Flags per check:\n%s", report.counts.to_string())
+    return 0
+
+
+def _features(config: Config) -> int:
+    raw_dir, lockbox = config.paths.raw_dir, pd.Timestamp(config.validation.lockbox_start)
+    raw = storage.load_ohlcv_panel(raw_dir)
+    raw = raw.loc[raw["date"] < lockbox]  # lockbox prices never enter development
+    index = storage.read_parquet(storage.index_path(raw_dir, config.data.index_symbol))
+    calendar = pd.DatetimeIndex(index.loc[index["date"] < lockbox, "date"].sort_values())
+    symbols = storage.read_parquet(raw_dir / storage.SYMBOLS_FILE)
+    exchange = symbols.set_index("symbol")["exchange"]
+    panel = builder.build_panel(raw, calendar, exchange, config)
+    out_dir = config.paths.processed_dir
+    storage.write_parquet(panel, out_dir / PANEL_FILE)
+    schema = {
+        "columns": builder.describe_columns(config.features),
+        "dtypes": {c: str(t) for c, t in panel.dtypes.items()},
+        "feature_groups": builder.feature_groups(config.features),
+        "prices_before": lockbox.date().isoformat(),
+        "snapshot": storage.read_json(raw_dir / storage.METADATA_FILE),
+        "rows": len(panel),
+    }
+    storage.write_json(schema, out_dir / SCHEMA_FILE)
+    per_day = panel.groupby("date").size()
+    first, last = panel["date"].min().date(), panel["date"].max().date()
+    symbols_used = panel["symbol"].nunique()
+    logger.info("Panel: %d rows, %d symbols, %s to %s", len(panel), symbols_used, first, last)
+    yearly = per_day.groupby(pd.DatetimeIndex(per_day.index).year).median()
+    logger.info("Universe size per year (median):\n%s", yearly.to_string())
     return 0
 
 
