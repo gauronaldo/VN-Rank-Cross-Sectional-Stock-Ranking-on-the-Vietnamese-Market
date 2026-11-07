@@ -8,17 +8,17 @@ over the next 5 trading days. It does not forecast prices or call market directi
 is measured by **Rank IC** and by whether a simple long-only portfolio built from the
 ranking survives trading costs.
 
-**Status:** Phase 1 (data) is built and awaiting review (2026-11-07). There are no model
-results yet.
+**Status:** Phases 0–1 are approved. Phase 2 (universe, features, labels) is built and
+awaiting review (2026-11-07). There are no model results yet.
 
 ## Project status
 
 | Phase | Scope | State |
 |---|---|---|
 | 0 | Scaffold, typed config, pre-registered protocol, lockbox guard design | **Done** |
-| 1 | Data: vnstock download, storage, validation, data-quality report | **In review** |
-| 2 | Universe, features, labels | Not started |
-| 3 | Walk-forward splits, baselines, Elastic Net, LightGBM, Rank IC | Not started |
+| 1 | Data: vnstock download, storage, validation, data-quality report | **Done** |
+| 2 | Universe, features, labels | **In review** |
+| 3 | Walk-forward splits, baselines, Elastic Net, LightGBM, Rank IC | Next |
 | 4 | MLP (multi-seed) | Not started |
 | 5 | Backtest net of costs, performance, bootstrap CIs | Not started |
 | 6 | Ablation, cost sensitivity, SHAP | Not started |
@@ -50,9 +50,9 @@ results yet.
   of a date guard on signal and label-exit dates, a development loader that truncates data
   before the lockbox, and a `--confirm-lockbox` command with a committed lock file.
 - **Tests.** 38 tests cover config parsing, validation, round-trips, and the CLI
-  (71 after Phase 1).
+  (71 after Phase 1, 100 after Phase 2).
 
-### Built in Phase 1 (awaiting approval)
+### Completed in Phase 1
 
 - **Snapshot.** vnstock 5.2.2, source `vci`, 2018-11-01 → 2026-11-06, downloaded
   2026-11-07: 1,755 symbols listed (HOSE 408, HNX 299, UPCoM 809, delisted 239), of which
@@ -64,7 +64,21 @@ results yet.
 - **Data quality.** `vn-rank validate-data` writes
   [`reports/data_quality.md`](reports/data_quality.md) and
   [`reports/tickers_per_year.png`](reports/tickers_per_year.png). Nothing is dropped yet;
-  the treatment of flagged rows is decided at the end of Phase 1.
+  the approved treatment of flagged rows is in `docs/protocol.md`, Section 2.
+
+### Built in Phase 2 (awaiting approval)
+
+- **Universe.** 252 sessions of history, a 60-session median traded value of at least
+  1 billion VND, and a trade on the day: about 320 stocks per session on 2022–2025 (154 in
+  late 2019, up to 480 in 2021).
+- **Features.** 15 hand-written price–volume features in 5 groups, each ranked within its
+  date; the forward 5-session return and its per-date rank as the target.
+- **Development panel.** `vn-rank features` loads prices before the lockbox only and
+  writes 449,922 rows (645 symbols, 2019-11-05 → 2025-09-30) with a column schema.
+- **Look-ahead test.** Rebuilding the panel on data cut at a date gives identical
+  features, ranks, and universe up to that date; injected leaks make it fail.
+- **EDA.** [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb): universe size, missingness,
+  feature distributions, and feature redundancy.
 
 ### Working agreements
 
@@ -86,6 +100,7 @@ The full pre-registered protocol is in [`docs/protocol.md`](docs/protocol.md).
 - **Label:** cross-sectional rank of the 5-day forward return. Entry is at the close after
   the signal.
 - **Features:** 15 hand-implemented price–volume features, each ranked within its date.
+- **Liquidity threshold:** 1 billion VND (60-session median traded value).
 - **Validation:** expanding walk-forward over 2022-01 → 2025-09 with 6-month test blocks,
   purge, and a 10-day embargo. The **lockbox** (2025-10 → latest) is evaluated once.
 - **Models:** momentum and reversal baselines, Elastic Net, LightGBM (primary), and an MLP.
@@ -116,6 +131,7 @@ make check             # lint + type-check + tests
 make validate-config   # load and validate configs/default.yaml
 make download          # vnstock snapshot into data/raw (Community API key required)
 make validate-data     # data-quality report and figure in reports/
+make features          # development panel in data/processed (prices before the lockbox)
 ```
 
 On Windows without `make`, run the underlying commands directly:
@@ -126,6 +142,7 @@ uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pyt
 uv run vn-rank validate-config
 uv run vn-rank download
 uv run vn-rank validate-data
+uv run vn-rank features
 ```
 
 `vnstock` is installed from the vendor index (the `data` dependency group). Register a
@@ -133,7 +150,7 @@ free Community API key once with `.venv\Scriptsnstock.exe register` (Windows) o
 `.venv/bin/vnstock register`. Without access to that index, `uv sync --no-group data`
 installs everything else.
 
-Pipeline targets (`features`, `train`, `backtest`, `report`) are added in later phases.
+Pipeline targets (`train`, `backtest`, `report`) are added in later phases.
 
 ## Repository map
 
