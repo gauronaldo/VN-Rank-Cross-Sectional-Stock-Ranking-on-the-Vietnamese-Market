@@ -39,6 +39,7 @@ def config(default_config_path: Path) -> Config:
         base.models,
         seeds=(0, 1),
         lightgbm=dataclasses.replace(base.models.lightgbm, max_boost_rounds=40),
+        mlp=dataclasses.replace(base.models.mlp, max_epochs=5, patience=2),
         tuning=dataclasses.replace(base.models.tuning, n_trials=2),
     )
     return dataclasses.replace(base, validation=validation, models=models)
@@ -72,10 +73,11 @@ def test_run_walk_forward_scores_every_model_on_every_fold(config: Config) -> No
     predictions = walk_forward.run_walk_forward(
         samples, specs, config, lambda record, trials: records.append(record)
     )
-    assert [s.name for s in specs] == ["momentum", "reversal", "elastic_net", "lightgbm"]
-    assert len(records) == 8
+    names = ["momentum", "reversal", "elastic_net", "lightgbm", "mlp"]
+    assert [s.name for s in specs] == names
+    assert len(records) == 10
     seeds = predictions.groupby("model")["seed"].nunique().to_dict()
-    assert seeds == {"momentum": 1, "reversal": 1, "elastic_net": 1, "lightgbm": 2}
+    assert seeds == {"momentum": 1, "reversal": 1, "elastic_net": 1, "lightgbm": 2, "mlp": 2}
     by_model = {r.model: r for r in records if r.fold == "2021-07/2021-12"}
     assert by_model["momentum"].n_trials == 0
     assert by_model["lightgbm"].n_trials == config.models.tuning.n_trials
@@ -153,6 +155,6 @@ def test_train_command_end_to_end_trips_on_planted_signal(config: Config, tmp_pa
     synthetic_panel(config).to_parquet(tmp_path / "processed" / "panel.parquet")
     assert main(["--config", str(path), "train"]) == 2
     report = (tmp_path / "reports" / "signal_results.md").read_text(encoding="utf-8")
-    assert "Optuna configurations tried: 8." in report
+    assert "Optuna configurations tried: 12." in report
     assert (tmp_path / "processed" / "predictions.parquet").exists()
     assert (tmp_path / "mlruns" / "mlflow.db").exists()

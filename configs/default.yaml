@@ -73,6 +73,10 @@ models:
     max_boost_rounds: 1000
     early_stopping_rounds: 50   # on inner-validation L2 loss
     bagging_freq: 1             # bagging on every iteration (bagging_fraction is tuned)
+  mlp:                          # fixed, not tuned (Phase 4)
+    batch_size: 4096
+    max_epochs: 30
+    patience: 5                 # epochs without inner-validation L2 improvement before stopping
   # Optuna (TPE, seeded with project.seed) inside each training window only; the objective
   # is mean daily Rank IC on the inner validation window. Approved at the start of Phase 3.
   tuning:
@@ -87,6 +91,12 @@ models:
       lambda_l2: {low: 1.0e-3, high: 100.0, log: true, integer: false}
       feature_fraction: {low: 0.5, high: 1.0, log: false, integer: false}
       bagging_fraction: {low: 0.5, high: 1.0, log: false, integer: false}
+    mlp:                        # chosen by the agent in Phase 4 under the author's standing approval
+      hidden_units: {low: 16, high: 128, log: true, integer: true}
+      n_layers: {low: 2, high: 3, log: false, integer: true}
+      dropout: {low: 0.0, high: 0.5, log: false, integer: false}
+      weight_decay: {low: 1.0e-6, high: 0.01, log: true, integer: false}
+      learning_rate: {low: 1.0e-4, high: 0.01, log: true, integer: false}
 
 evaluation:
   n_quantiles: 5                # quintile returns

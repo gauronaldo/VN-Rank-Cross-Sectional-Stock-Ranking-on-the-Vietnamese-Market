@@ -136,12 +136,22 @@ class LightGBMConfig:
 
 
 @dataclasses.dataclass(frozen=True)
+class MLPConfig:
+    """MLP settings that are fixed, not tuned."""
+
+    batch_size: int
+    max_epochs: int
+    patience: int
+
+
+@dataclasses.dataclass(frozen=True)
 class TuningConfig:
     """Optuna budget and search space per model (inner validation window only)."""
 
     n_trials: int
     elastic_net: dict[str, SearchRange]
     lightgbm: dict[str, SearchRange]
+    mlp: dict[str, SearchRange]
 
 
 @dataclasses.dataclass(frozen=True)
@@ -154,6 +164,7 @@ class ModelsConfig:
     missing_rank_fill: float
     elastic_net_max_iter: int
     lightgbm: LightGBMConfig
+    mlp: MLPConfig
     tuning: TuningConfig
 
 
@@ -257,6 +268,7 @@ def validate_config(config: Config) -> None:
         config.validation,
         config.evaluation,
         models.lightgbm,
+        models.mlp,
         models.tuning,
     )
     for section in sections:
@@ -264,7 +276,8 @@ def validate_config(config: Config) -> None:
     _check_periods(config.data.history_start, config.validation)
     _check_rates(config.universe, config.backtest)
     _check_misc(config)
-    _check_search_space({**models.tuning.elastic_net, **models.tuning.lightgbm})
+    for space in (models.tuning.elastic_net, models.tuning.lightgbm, models.tuning.mlp):
+        _check_search_space(space)
 
 
 def _require(condition: bool, message: str) -> None:

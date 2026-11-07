@@ -22,7 +22,7 @@ import pandas as pd
 from vn_rank.config import Config, SearchRange
 from vn_rank.evaluation.ic import RETURN_COLUMN, SCORE_COLUMN, SignalSettings, signal_summary
 from vn_rank.features.builder import feature_groups
-from vn_rank.models import baselines, gbm, linear, tuning
+from vn_rank.models import baselines, gbm, linear, mlp, tuning
 from vn_rank.models.base import RankingModel, feature_columns
 from vn_rank.validation import splits
 
@@ -58,18 +58,33 @@ class FoldRecord:
 FoldLogger = Callable[[FoldRecord, pd.DataFrame | None], None]
 
 
-def model_specs(config: Config) -> list[ModelSpec]:
-    """Baselines, Elastic Net, and LightGBM, built from the configuration."""
+def _split_count(params: dict[str, float], key: str) -> tuple[dict[str, float], int | None]:
+    """Separate a learned count (rounds, epochs) from the tuned parameters."""
+    tuned = {k: v for k, v in params.items() if k != key}
+    return tuned, int(params[key]) if key in params else None
+
+
+def model_specs(config: Config, features: list[str] | None = None) -> list[ModelSpec]:
+    """Baselines, Elastic Net, LightGBM, and the MLP, built from the configuration.
+
+    Args:
+        config: Model, tuning, and validation settings.
+        features: Feature rank columns for the learned models; all features by default
+            (the feature-group ablation passes a subset).
+    """
     models, lockbox = config.models, config.validation.lockbox_start
-    features = feature_columns(feature_groups(config.features))
+    features = features or feature_columns(feature_groups(config.features))
     en_settings = linear.ElasticNetSettings(models.missing_rank_fill, models.elastic_net_max_iter)
+    mlp_settings = mlp.MLPSettings(models.mlp, models.missing_rank_fill)
 
     def gbm_factory(params: dict[str, float], seed: int) -> RankingModel:
-        tuned = {k: v for k, v in params.items() if k != gbm.ROUNDS_KEY}
-        rounds = int(params[gbm.ROUNDS_KEY]) if gbm.ROUNDS_KEY in params else None
-        return gbm.LightGBMModel(
-            features, gbm.GBMRun(tuned, seed, rounds), models.lightgbm, lockbox
-        )
+        tuned, rounds = _split_count(params, gbm.ROUNDS_KEY)
+        run = gbm.GBMRun(tuned, seed, rounds)
+        return gbm.LightGBMModel(features, run, models.lightgbm, lockbox)
+
+    def mlp_factory(params: dict[str, float], seed: int) -> RankingModel:
+        tuned, epochs = _split_count(params, mlp.EPOCHS_KEY)
+        return mlp.MLPModel(features, mlp.MLPRun(tuned, seed, epochs), mlp_settings, lockbox)
 
     one_seed = (config.project.seed,)
     return [
@@ -92,6 +107,7 @@ def model_specs(config: Config) -> list[ModelSpec]:
             one_seed,
         ),
         ModelSpec("lightgbm", gbm_factory, models.tuning.lightgbm, models.seeds),
+        ModelSpec("mlp", mlp_factory, models.tuning.mlp, models.seeds),
     ]
 
 
