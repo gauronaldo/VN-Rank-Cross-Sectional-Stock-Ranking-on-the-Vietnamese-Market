@@ -184,6 +184,58 @@ features, ranks, eligibility, and row sets up to the cut. It was checked by inje
 leaks (tomorrow's close in a return, a centred rolling window, next-session liquidity in
 the universe); each one fails the test.
 
+## Validation, models, and tuning (Phase 3)
+
+**Splits.** Test blocks are calendar half-years (the last one is 2025-07 to 2025-09).
+A training row is purged when its `exit_date` is on or after the block start, and the
+last `embargo_days` purged sessions are then dropped, so with `h = 5` the last training
+signal date is 17 sessions before the first test date (the protocol's "at least 16").
+Test rows whose label exits in the lockbox are dropped, which ends the last block on
+2025-09-22. Dates with fewer than `min_stocks_per_date` eligible stocks are removed
+before any split. The purge-alignment test checks every fold for label-window overlap
+and the exact session gap.
+
+**Lockbox guard (implemented).** `ensure_before_lockbox` treats a missing exit date as
+a violation, because such a label cannot be shown to end before the lockbox. It runs in
+`development_samples`, in `split_fold` on both sets, and in `RankingModel.fit` on every
+frame, which covers every tuning trial.
+
+**Tuning.** Optuna's seeded TPE sampler maximizes the mean daily Rank IC on the inner
+validation window (the last 6 months of the training window, purged and embargoed like
+a test block). A model with constant scores has no defined Rank IC and scores 0. The
+final model is refit on the whole training window with the best parameters; LightGBM
+reuses the number of rounds that early stopping found on the inner validation set
+(early stopping uses L2 loss, which is cheap to evaluate every round, while the trial is
+judged by Rank IC). Test blocks are only scored, never used for a choice.
+
+**Constant scores.** A date on which a model gives every stock the same score has a
+Rank IC of 0 and no quantiles. It happened once: on the 2023H2 fold every Elastic Net
+trial with a non-zero fit had a negative validation Rank IC (about -0.03), so tuning
+chose a penalty that zeroes every coefficient. Counting those dates as 0 rather than
+dropping them keeps an abstaining model from looking better than it is.
+
+**Seeds.** Baselines and Elastic Net (cyclic coordinate descent) are deterministic and
+run once. LightGBM uses feature and bagging subsampling, so it is tuned once with
+`project.seed` and refit with each of the 5 `models.seeds`; results are the mean and
+standard deviation across those seeds. `deterministic = true` and `force_row_wise`
+make a LightGBM run repeatable for a given seed on the same machine and thread count.
+
+**Inputs.** All models use the 15 feature ranks. Elastic Net centres them at 0.5 and
+fills the rare missing rank (`rank_log_tv_20`, 0.018% of rows) with 0.5, the median
+rank; LightGBM keeps NaN and routes it natively. Approved by the author.
+
+**Experiment tracking.** MLflow 3.18 refuses its file-store backend, so runs go to a
+SQLite database `mlruns/mlflow.db` with artifacts in `mlruns/artifacts` (both
+gitignored). Each `train` run is a parent run (config hash and git commit) with one
+nested run per model and fold, holding the chosen parameters, validation and test mean
+Rank IC, and the Optuna trial table. The parent run records the total number of
+configurations tried.
+
+**Module additions.** `validation/walk_forward.py` holds the fold loop, the results
+table, and the tripwire check, which keeps `cli.py` thin (approved by the author).
+MLflow logging lives in `utils/logging.py`. scikit-learn ships no type information, so
+`pyproject.toml` tells mypy to ignore its missing imports.
+
 ## Rationale to complete in Phase 8
 
 - Why a 5-day horizon.

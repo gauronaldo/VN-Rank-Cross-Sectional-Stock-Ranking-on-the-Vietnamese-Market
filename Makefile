@@ -40,7 +40,10 @@ validate-data:  ## Data-quality report and tickers-per-year figure
 features:  ## Build the development panel (prices before lockbox_start) in data/processed
 	$(UV) vn-rank --config $(CONFIG) features
 
+train:  ## Tune, fit, and score all models on walk-forward folds (reports/signal_results.md)
+	$(UV) vn-rank --config $(CONFIG) train
+
 # Pipeline targets are implemented in later phases (AGENT.md section 7).
-train backtest report:
+backtest report:
 	@echo "'make $@' is not implemented yet; it is built in a later phase." >&2
 	@exit 1

@@ -8,8 +8,9 @@ over the next 5 trading days. It does not forecast prices or call market directi
 is measured by **Rank IC** and by whether a simple long-only portfolio built from the
 ranking survives trading costs.
 
-**Status:** Phases 0–1 are approved. Phase 2 (universe, features, labels) is built and
-awaiting review (2026-11-07). There are no model results yet.
+**Status:** Phases 0–2 are approved. Phase 3 (walk-forward validation, baselines, Elastic
+Net, LightGBM) is built and awaiting review (2026-11-07). Signal-level walk-forward results
+are below; portfolio results come in Phase 5.
 
 ## Project status
 
@@ -17,9 +18,9 @@ awaiting review (2026-11-07). There are no model results yet.
 |---|---|---|
 | 0 | Scaffold, typed config, pre-registered protocol, lockbox guard design | **Done** |
 | 1 | Data: vnstock download, storage, validation, data-quality report | **Done** |
-| 2 | Universe, features, labels | **In review** |
-| 3 | Walk-forward splits, baselines, Elastic Net, LightGBM, Rank IC | Next |
-| 4 | MLP (multi-seed) | Not started |
+| 2 | Universe, features, labels | **Done** |
+| 3 | Walk-forward splits, baselines, Elastic Net, LightGBM, Rank IC | **In review** |
+| 4 | MLP (multi-seed) | Next |
 | 5 | Backtest net of costs, performance, bootstrap CIs | Not started |
 | 6 | Ablation, cost sensitivity, SHAP | Not started |
 | 7 | Lockbox (run once) and daily update command | Not started |
@@ -66,7 +67,7 @@ awaiting review (2026-11-07). There are no model results yet.
   [`reports/tickers_per_year.png`](reports/tickers_per_year.png). Nothing is dropped yet;
   the approved treatment of flagged rows is in `docs/protocol.md`, Section 2.
 
-### Built in Phase 2 (awaiting approval)
+### Completed in Phase 2
 
 - **Universe.** 252 sessions of history, a 60-session median traded value of at least
   1 billion VND, and a trade on the day: about 320 stocks per session on 2022–2025 (154 in
@@ -79,6 +80,22 @@ awaiting review (2026-11-07). There are no model results yet.
   features, ranks, and universe up to that date; injected leaks make it fail.
 - **EDA.** [`notebooks/01_eda.ipynb`](notebooks/01_eda.ipynb): universe size, missingness,
   feature distributions, and feature redundancy.
+
+### Built in Phase 3 (awaiting approval)
+
+- **Splits.** Eight expanding-window folds (half-year test blocks, 2022-01 → 2025-09).
+  Training labels that end on or after the block start are purged, 10 more sessions are
+  embargoed, and test labels that end in the lockbox are dropped. Dates with fewer than
+  50 eligible stocks are removed. The purge-alignment test checks every fold.
+- **Lockbox guard.** An explicit `raise` (not `assert`) on every split and every model
+  `fit`, which covers every tuning trial; tested.
+- **Models.** 20-day momentum and 5-day reversal baselines, Elastic Net, and LightGBM
+  (5 seeds). Optuna tunes Elastic Net and LightGBM inside each training window on the
+  last 6 months (30 trials per model per fold, 480 in total), scored by validation mean
+  Rank IC; every fold is logged to MLflow.
+- **Rank IC metrics.** Hand-written daily Rank IC, IC IR, Newey-West t-statistic, quintile
+  returns, and signal autocorrelation, tested against known answers and `statsmodels`.
+- **Reproducibility.** Two full runs produced identical predictions.
 
 ### Working agreements
 
@@ -110,7 +127,25 @@ The full pre-registered protocol is in [`docs/protocol.md`](docs/protocol.md).
 
 ## Results
 
-_To be added after Phases 3–7._
+### Signal level, walk-forward folds (Phase 3, preliminary)
+
+Rank IC is the per-date Spearman correlation between scores and 5-day forward returns,
+pooled over the 925 test dates of 2022-01 → 2025-09. IC IR is per day (not annualized);
+the t-statistic uses Newey-West standard errors with lag 4. LightGBM is the mean of 5
+seeds (seed standard deviation 0.0009). Full tables: [`reports/signal_results.md`](reports/signal_results.md).
+
+| Model | Mean Rank IC | IC IR | NW t | Folds with positive IC |
+|---|---|---|---|---|
+| Momentum (20 d) | -0.0005 | -0.003 | -0.05 | 4 / 8 |
+| Reversal (5 d) | 0.0047 | 0.026 | 0.49 | 5 / 8 |
+| Elastic Net | 0.0402 | 0.197 | 3.26 | 6 / 8 |
+| **LightGBM** (primary) | **0.0584** | **0.433** | **7.51** | **8 / 8** |
+
+The pre-registered criterion C1 (95% block-bootstrap CI of LightGBM's mean Rank IC above
+zero) is evaluated in Phase 5, when the bootstrap is built. Single features carry much of
+the signal: low volatility (ATR rank: Rank IC -0.061), liquidity, and closeness to the
+252-day high. Most of the quintile spread comes from the bottom quintile, which a
+long-only portfolio cannot short.
 
 ## Limitations
 
@@ -132,6 +167,7 @@ make validate-config   # load and validate configs/default.yaml
 make download          # vnstock snapshot into data/raw (Community API key required)
 make validate-data     # data-quality report and figure in reports/
 make features          # development panel in data/processed (prices before the lockbox)
+make train             # walk-forward tuning and scoring (about 8 minutes on 12 cores)
 ```
 
 On Windows without `make`, run the underlying commands directly:
@@ -143,6 +179,7 @@ uv run vn-rank validate-config
 uv run vn-rank download
 uv run vn-rank validate-data
 uv run vn-rank features
+uv run vn-rank train
 ```
 
 `vnstock` is installed from the vendor index (the `data` dependency group). Register a
@@ -150,7 +187,9 @@ free Community API key once with `.venv\Scriptsnstock.exe register` (Windows) o
 `.venv/bin/vnstock register`. Without access to that index, `uv sync --no-group data`
 installs everything else.
 
-Pipeline targets (`train`, `backtest`, `report`) are added in later phases.
+`train` logs every fold to MLflow (`mlruns/mlflow.db`; browse with
+`uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`). Pipeline targets
+`backtest` and `report` are added in later phases.
 
 ## Repository map
 
