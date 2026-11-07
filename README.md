@@ -1,7 +1,18 @@
 # VN-Rank: cross-sectional stock ranking on the Vietnamese market
 
+[![check](https://github.com/gauronaldo/VN-Rank-Cross-Sectional-Stock-Ranking-on-the-Vietnamese-Market/actions/workflows/check.yml/badge.svg)](https://github.com/gauronaldo/VN-Rank-Cross-Sectional-Stock-Ranking-on-the-Vietnamese-Market/actions/workflows/check.yml)
+
 > **Research question:** can price–volume features rank Vietnamese stocks by 5-day forward
 > return, net of trading costs?
+
+**In 30 seconds.** Yes, they can rank: LightGBM's Rank IC is 0.058 on four years of
+walk-forward tests and 0.100 on a held-out year evaluated once, so both pre-registered
+criteria hold. But the edge is mostly the low-volatility effect (a one-line rule ties
+the models), and weekly turnover costs more than the ranking earns. No strategy here
+has alpha after costs and beta. The value of the project is a leakage-safe protocol
+that shows this honestly.
+
+![Summary: Rank IC by model and period, and the walk-forward cost story](reports/summary.png)
 
 VN-Rank ranks the liquid Vietnamese stocks every day by expected relative performance
 over the next 5 trading days. It does not forecast prices or call market direction.
@@ -235,6 +246,10 @@ make exploratory       # post-lockbox low-volatility comparison (exploratory)
 run (commit `60375ba`). Every run is logged to MLflow (`mlruns/mlflow.db`; browse with
 `uv run mlflow ui --backend-store-uri sqlite:///mlruns/mlflow.db`). Configurations tried:
 720 Optuna trials in walk-forward, 1,920 in the ablation, and 90 for the lockbox model.
+
+Continuous integration runs the lint, type-check, and test suite on every push (Windows
+runner; the vnstock data group is not installed and no test needs market data). A fresh
+clone synced with `uv sync --locked --no-group data` passes the same checks.
 
 On Windows without `make`, run the commands directly, for example
 `uv run ruff check . && uv run ruff format --check . && uv run mypy && uv run pytest`
