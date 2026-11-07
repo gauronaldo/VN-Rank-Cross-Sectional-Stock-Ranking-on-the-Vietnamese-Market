@@ -120,3 +120,17 @@ def test_render_markdown_lists_sections() -> None:
     assert "- **source:** vci" in text
     assert "## Largest band breaches (top 5)" in text
     assert "| 2024-01-02 | AAA | HOSE | 0.0800 |" in text
+
+
+def test_flags_are_numpy_bool_with_pyarrow_strings() -> None:
+    panel = _panel("AAA", [10, 10.8]).astype({"symbol": "string[pyarrow]"})
+    symbols = SYMBOLS.astype({"symbol": "string[pyarrow]", "exchange": "string[pyarrow]"})
+    report = validate.run_quality_checks(panel, symbols, CALENDAR, SETTINGS)
+    assert report.counts["rows"].dtype == np.int64
+    assert report.counts.loc["band_breach", "rows"] == 1
+
+
+def test_unknown_exchange_band_raises() -> None:
+    exchange = pd.Series({"AAA": "HNX"})
+    with pytest.raises(KeyError, match="HNX"):
+        validate.flag_rows(_panel("AAA", [10, 11]), exchange, SETTINGS, CALENDAR)

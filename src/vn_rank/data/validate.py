@@ -76,10 +76,17 @@ def flag_rows(
         calendar: VNINDEX trading dates.
 
     Returns:
-        A boolean frame aligned with ``panel``.
+        A boolean frame (NumPy ``bool``) aligned with ``panel``.
+
+    Raises:
+        KeyError: If a symbol has no exchange or an exchange has no price band.
     """
     prices = panel[list(PRICE_COLUMNS)]
-    band = panel["symbol"].map(exchange).map(settings.price_limits)
+    codes = panel["symbol"].map(exchange).astype(object)
+    unknown = set(codes.dropna()) - set(settings.price_limits)
+    if codes.isna().any() or unknown:
+        raise KeyError(f"no price band for exchanges {sorted(unknown)} or symbols without one")
+    band = codes.map(settings.price_limits).astype(float)
     return pd.DataFrame(
         {
             "duplicate": panel.duplicated(["symbol", "date"], keep=False),
@@ -168,16 +175,17 @@ def plot_tickers_per_year(table: pd.DataFrame) -> Figure:
     """Stacked bars of traded symbols per year, listed versus delisted (survivorship view)."""
     figure = Figure(figsize=(8, 4))
     axes = figure.add_subplot()
-    years = table.index.astype(str)
+    positions = np.arange(len(table))
     bottom = np.zeros(len(table))
     for status in table.columns:
         bars = axes.bar(
-            years, table[status], bottom=bottom, width=0.6, label=status,
+            positions, table[status], bottom=bottom, width=0.6, label=status,
             color=_SERIES_COLORS[status], edgecolor="white", linewidth=2,
         )  # fmt: skip
         axes.bar_label(bars, label_type="center", color="white", fontsize=8)
         bottom = bottom + table[status].to_numpy()
     axes.set_title("Symbols with at least one trade per year (first and last years are partial)")
+    axes.set_xticks(positions, [str(year) for year in table.index])
     axes.set_ylabel("symbols")
     axes.legend(frameon=False, loc="upper left")
     axes.spines[["top", "right"]].set_visible(False)
