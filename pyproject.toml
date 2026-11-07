@@ -5,8 +5,8 @@ description = "Cross-sectional ranking of Vietnamese stocks by 5-day forward ret
 readme = "README.md"
 requires-python = ">=3.11"
 # Exact pins: every version below resolves on Python 3.11 through 3.13.
-# vnstock is intentionally absent until Phase 1: the PyPI project is quarantined and
-# generation 5 is distributed from a separate package index (see docs/design_notes.md).
+# vnstock lives in the separate "data" group because generation 5 is distributed from the
+# vendor's own package index, not PyPI (see docs/design_notes.md).
 dependencies = [
     "duckdb==2.0.0",
     "lightgbm==4.7.0",
@@ -37,6 +37,23 @@ dev = [
     "ruff==0.17.4",
     "types-PyYAML==6.0.12.20261103",
 ]
+# Market-data download only; needs network access to the vendor index below.
+data = [
+    "vnstock==5.2.2",
+]
+
+[tool.uv]
+default-groups = ["dev", "data"]
+
+# Only packages pinned to this index in [tool.uv.sources] are resolved from it
+# (explicit = true), so no other dependency can be shadowed by the vendor index.
+[[tool.uv.index]]
+name = "vnstocks"
+url = "https://vnstocks.com/api/packages"
+explicit = true
+
+[tool.uv.sources]
+vnstock = { index = "vnstocks" }
 
 [build-system]
 requires = ["uv_build>=0.11,<0.12"]
