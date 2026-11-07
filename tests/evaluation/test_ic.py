@@ -53,8 +53,29 @@ def test_daily_rank_ic_known_answers() -> None:
     returns = np.array([np.arange(10.0), np.arange(10.0), np.arange(10.0)])
     scores = np.array([np.arange(10.0), -np.arange(10.0), np.ones(10)])
     daily = ic.daily_rank_ic(scored_frame(scores, returns))
-    assert list(daily.index) == list(DATES[:2])  # constant scores give no IC
-    assert daily.to_list() == pytest.approx([1.0, -1.0])
+    assert list(daily.index) == list(DATES[:3])
+    assert daily.to_list() == pytest.approx([1.0, -1.0, 0.0])  # constant scores: IC 0
+
+
+def test_daily_rank_ic_drops_dates_with_constant_returns() -> None:
+    returns = np.array([np.arange(10.0), np.zeros(10)])
+    daily = ic.daily_rank_ic(scored_frame(np.tile(np.arange(10.0), (2, 1)), returns))
+    assert list(daily.index) == [DATES[0]]
+
+
+def test_abstaining_model_summary_has_zero_ic_and_no_quantiles() -> None:
+    returns = np.random.default_rng(5).normal(size=(12, 10))
+    frame = scored_frame(np.ones((12, 10)), returns)
+    summary = ic.signal_summary(frame, ic.SignalSettings(horizon_days=5, n_quantiles=5))
+    assert summary["mean_ic"] == 0.0
+    assert summary["n_dates"] == 12
+    for key in ("ic_ir", "t_nw", "q1", "q5", "top_minus_bottom", "signal_autocorr"):
+        assert np.isnan(summary[key])
+
+
+def test_newey_west_degenerate_inputs_are_nan() -> None:
+    assert np.isnan(ic.newey_west_tstat(pd.Series([0.1]), 4))
+    assert np.isnan(ic.newey_west_tstat(pd.Series([0.0, 0.0, 0.0]), 4))
 
 
 def test_newey_west_lag_zero_is_plain_tstat() -> None:

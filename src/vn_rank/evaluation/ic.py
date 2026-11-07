@@ -6,6 +6,9 @@ a long frame with columns ``date``, ``symbol``, a score column, and ``forward_re
 
 Conventions:
 
+- A date on which the model gives every stock the same score has a Rank IC of 0: the
+  model offers no ranking, which counts as no skill rather than being dropped (dropping
+  would flatter a model that abstains on hard periods). Such dates have no quantiles.
 - IC IR is ``mean / std`` of the daily Rank IC series (``ddof = 1``), per day, not
   annualized.
 - The t-statistic of the mean Rank IC uses a Newey-West (Bartlett kernel) standard error
@@ -47,12 +50,20 @@ def spearman(left: pd.Series, right: pd.Series) -> float:
     return float(np.corrcoef(ranks["left"], ranks["right"])[0, 1])
 
 
+def _date_rank_ic(group: pd.DataFrame, score: str) -> float:
+    value = spearman(group[score], group[RETURN_COLUMN])
+    pairs = group[[score, RETURN_COLUMN]].dropna()
+    abstains = pairs[score].nunique() == 1 and pairs[RETURN_COLUMN].nunique() > 1
+    return 0.0 if abstains else value
+
+
 def daily_rank_ic(frame: pd.DataFrame, score: str = SCORE_COLUMN) -> pd.Series:
-    """Rank IC per signal date, indexed by date; undefined dates are dropped."""
-    ic = {
-        date: spearman(group[score], group[RETURN_COLUMN])
-        for date, group in frame.groupby("date", sort=True)
-    }
+    """Rank IC per signal date, indexed by date.
+
+    A date with constant scores (but varying returns) has Rank IC 0; dates that are
+    otherwise undefined (fewer than two stocks, constant returns) are dropped.
+    """
+    ic = {date: _date_rank_ic(group, score) for date, group in frame.groupby("date", sort=True)}
     return pd.Series(ic, dtype=float, name="rank_ic").rename_axis("date").dropna()
 
 
@@ -61,28 +72,34 @@ def newey_west_tstat(values: pd.Series, lag: int) -> float:
 
     The long-run variance is ``g0 + 2 * sum_{k=1..lag} (1 - k / (lag + 1)) * gk``, where
     ``gk`` is the lag-``k`` autocovariance with divisor ``n`` (no small-sample correction).
+    Returns NaN with fewer than two values or a zero long-run variance.
     """
     x = values.to_numpy(dtype=float)
-    deviations = x - x.mean()
     n = len(x)
+    if n < 2:  # noqa: PLR2004
+        return float("nan")
+    deviations = x - x.mean()
     long_run = float(deviations @ deviations) / n
     for k in range(1, min(lag, n - 1) + 1):
         weight = 1.0 - k / (lag + 1)
         long_run += 2.0 * weight * float(deviations[k:] @ deviations[:-k]) / n
-    return float(x.mean() / np.sqrt(long_run / n))
+    return float(x.mean() / np.sqrt(long_run / n)) if long_run > 0 else float("nan")
 
 
 def quantile_returns(frame: pd.DataFrame, n_quantiles: int, score: str = SCORE_COLUMN) -> pd.Series:
     """Mean forward return per score quantile (1 = lowest scores), averaged over dates.
 
     Within a date, stocks are ordered by score (ties broken by row order) and cut into
-    ``n_quantiles`` groups of near-equal size.
+    ``n_quantiles`` groups of near-equal size. Dates with constant scores have no order
+    and are skipped; a quantile with no data is NaN.
     """
     valid = frame.dropna(subset=[score, RETURN_COLUMN])
+    valid = valid.loc[valid.groupby("date")[score].transform("nunique") > 1]
     pct = valid.groupby("date")[score].rank(method="first", pct=True)
     bucket = np.ceil(pct * n_quantiles).clip(1, n_quantiles).astype(int)
     per_date = valid.groupby([valid["date"], bucket.rename("quantile")])[RETURN_COLUMN].mean()
-    return per_date.groupby(level="quantile").mean()
+    means = per_date.groupby(level="quantile").mean()
+    return means.reindex(pd.RangeIndex(1, n_quantiles + 1, name="quantile"))
 
 
 def rebalance_dates(dates: pd.Series, every: int) -> pd.DatetimeIndex:
@@ -113,10 +130,11 @@ def signal_summary(
     ic = daily_rank_ic(frame, score)
     quantiles = quantile_returns(frame, settings.n_quantiles, score)
     autocorr = signal_autocorrelation(frame, settings.horizon_days, score)
+    std = float(ic.std())
     summary = {
         "mean_ic": float(ic.mean()),
-        "ic_std": float(ic.std()),
-        "ic_ir": float(ic.mean() / ic.std()),
+        "ic_std": std,
+        "ic_ir": float(ic.mean()) / std if std > 0 else float("nan"),
         "t_nw": newey_west_tstat(ic, settings.horizon_days - 1),
         "n_dates": float(len(ic)),
     }
