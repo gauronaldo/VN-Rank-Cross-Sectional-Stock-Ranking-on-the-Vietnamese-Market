@@ -30,7 +30,7 @@ data:
 universe:
   min_history_days: 252         # trading days of history required up to t
   traded_value_window: 60       # window for the median traded value filter
-  min_traded_value_vnd: null    # Phase 2 decision; in VND (close is in thousand VND)
+  min_traded_value_vnd: 1000000000.0  # 1 billion VND (decided in Phase 2; sensitivity 0.5/2/5 bn in Phase 6)
 
 label:
   horizon_days: 5               # h: holding period in trading days

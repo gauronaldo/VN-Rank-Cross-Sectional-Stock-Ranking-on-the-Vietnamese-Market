@@ -29,7 +29,7 @@ def test_default_config_loads_with_typed_fields(default_config_path: Path) -> No
     assert config.features.return_windows == (1, 5, 20, 60, 120)
     assert config.label.horizon_days == 5
     assert config.backtest.costs.selling_tax == pytest.approx(0.001)
-    assert config.universe.min_traded_value_vnd is None
+    assert config.universe.min_traded_value_vnd == pytest.approx(1e9)
 
 
 def test_round_trip_through_dict(default_config_path: Path) -> None:

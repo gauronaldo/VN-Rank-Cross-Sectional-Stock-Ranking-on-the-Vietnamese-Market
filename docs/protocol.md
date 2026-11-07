@@ -35,7 +35,11 @@ forecast price levels or market direction. Accuracy, RMSE, and MAPE are not used
   3. returns beyond the exchange price band are kept as they are, neither capped nor
      dropped (most are new listings, first sessions after a suspension, or exchange
      transfers);
-  4. symbols with no data (empty, or unknown to the source) are excluded.
+  4. symbols with no data (empty, or unknown to the source) are excluded;
+  5. every symbol is aligned to the VNINDEX calendar from its first row on: a session
+     without a row becomes a no-trade bar (previous close carried forward,
+     `open = high = low = close`, volume 0), so every window and the horizon `h` count
+     market sessions. A label whose exit session is after the symbol's last row is missing.
 
 ## 3. Universe (point-in-time)
 
@@ -43,8 +47,9 @@ A stock is eligible on trading date `t` if all of the following hold, using only
 up to and including `t`:
 
 1. at least `min_history_days` = 252 trading days of history up to `t`;
-2. median traded value (`close × 1000 × volume`, in VND) over the previous
-   `traded_value_window` = 60 trading days ≥ `min_traded_value_vnd` (decided in Phase 2);
+2. median traded value (`close × 1000 × volume`, in VND) over the
+   `traded_value_window` = 60 sessions ending on `t` ≥ `min_traded_value_vnd`
+   = 1 billion VND (decided in Phase 2; no-trade sessions count as 0);
 3. volume on `t` is greater than zero.
 
 Exchanges: HOSE, HNX, UPCoM, and delisted symbols (see the changelog); the liquidity filter
@@ -180,3 +185,5 @@ Expressed in Rank IC; Sharpe is never a success criterion.
 | 2026-11-06 | Approved and locked, including all [proposed] items. | End of Phase 0. |
 | 2026-11-07 | Include the 239 `DELISTED` symbols in the data and the universe; the price-limit check uses the widest band (UPCoM, ±15%) for them because their original exchange is unknown. | Phase 1 probe showed their history is available; including them reduces survivorship bias. Approved by the author. |
 | 2026-11-07 | Add the data-treatment rules in Section 2. | Decided by the author after the Phase 1 data-quality report, before any feature or label was built. |
+| 2026-11-07 | Set `min_traded_value_vnd` to 1 billion VND, fixed before any model is fitted; LightGBM is also reported at 0.5, 2, and 5 billion VND in Phase 6 as a sensitivity check that never replaces the primary result. | Universe-size, liquidity, and churn analysis on 2022-01 → 2025-09 (no labels or returns): about 323 eligible stocks per day, a top decile of about 32, and 97% of market traded value. Approved by the author. |
+| 2026-11-07 | Add data-treatment rule 5 (alignment to the VNINDEX calendar). | 0.12% of label windows in the universe spanned more than `1 + h` sessions because of missing rows (mostly suspensions). Approved by the author. |
