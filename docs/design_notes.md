@@ -146,6 +146,44 @@ The rules are listed in `docs/protocol.md`, Section 2. The reasons:
 - **Excluded symbols.** 25 delisted symbols unknown to `vci` and 10 empty ones; they are
   listed in `reports/data_quality.md`.
 
+## Features, universe, and labels (Phase 2)
+
+**Wide frames on the market calendar.** Prices are pivoted to one frame per field
+(VNINDEX sessions x symbols). Every indicator is then a column-wise `shift` (positive
+lags), `rolling`, or `ewm`, which is causal by construction, and every cross-sectional
+step is row-wise. A session without a row after a symbol's first row is a no-trade bar
+(protocol rule 5), so windows and the horizon count market sessions. The forward fill
+is not bounded by the symbol's last row: on day `t` a real-time system cannot know that
+a stock will never trade again. The only forward-looking frame is `alive` (sessions up
+to the last real row), used to make a label missing when the exit session falls after a
+delisting.
+
+**Indicator conventions.** Returns are simple returns. Volatility is the sample standard
+deviation (`ddof = 1`) of daily returns. RSI and ATR use Wilder smoothing as an EMA with
+`alpha = 1 / n` seeded with the first value rather than an `n`-day average; the two agree
+long before the 252-session history requirement. MACD uses EMAs with `alpha = 2 / (span
++ 1)`; the histogram and ATR are divided by `close` so they are comparable across price
+levels. Bollinger %B uses the population standard deviation (`ddof = 0`), the usual
+convention. Amihud is the mean of `|return| / traded value` over the sessions in the
+window that traded, per billion VND. The 252-session high uses `high`, not `close`.
+
+**Ranks.** Each feature is ranked within its date among universe members only, scaled to
+`(rank - 1) / (n - 1)` with average ties (0.5 when a date has one stock). Missing raw
+values stay missing in the rank. The target is the same rank of the forward return
+among members with a known label.
+
+**Development panel.** `vn-rank features` loads prices strictly before `lockbox_start`
+(design of the lockbox guard, point 3), so the last labels end on 2025-09-30 and signal
+dates whose exit falls in the lockbox have a missing target. The panel is written to
+`data/processed/panel.parquet` with `schema.json` (one description per column, dtypes,
+feature groups, and the snapshot metadata).
+
+**Testing.** The truncation test rebuilds the panel on data cut at six dates (including
+a gap in a symbol's rows, a delisting, and the last session) and requires identical
+features, ranks, eligibility, and row sets up to the cut. It was checked by injecting
+leaks (tomorrow's close in a return, a centred rolling window, next-session liquidity in
+the universe); each one fails the test.
+
 ## Rationale to complete in Phase 8
 
 - Why a 5-day horizon.
