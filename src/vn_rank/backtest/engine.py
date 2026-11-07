@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import dataclasses
 import math
+from collections.abc import Callable
 
 import numpy as np
 import pandas as pd
@@ -63,6 +64,10 @@ class BacktestResult:
     trades: pd.DataFrame
 
 
+TargetRule = Callable[[pd.Series, pd.Index], pd.Series]
+"""Maps (scores per symbol, symbols currently held) to target weights."""
+
+
 def top_quantile_weights(scores: pd.Series, top_quantile: float) -> pd.Series:
     """Equal weights on the ``ceil(top_quantile * n)`` highest scores (NaN scores skipped)."""
     valid = scores.dropna()
@@ -74,6 +79,35 @@ def top_quantile_weights(scores: pd.Series, top_quantile: float) -> pd.Series:
 def equal_weights(symbols: pd.Index) -> pd.Series:
     """Equal weights on every symbol (the same-universe benchmark)."""
     return pd.Series(1.0 / len(symbols), index=symbols)
+
+
+def top_quantile_rule(top_quantile: float) -> TargetRule:
+    """Primary rule: the top quantile by score, ignoring current holdings."""
+    return lambda scores, held: top_quantile_weights(scores, top_quantile)
+
+
+def equal_weight_rule() -> TargetRule:
+    """Benchmark rule: every scored stock at equal weight."""
+    return lambda scores, held: equal_weights(scores.dropna().index)
+
+
+def band_rule(top_quantile: float, band: float) -> TargetRule:
+    """Turnover-control rule (AGENT.md 3.7, secondary variant).
+
+    A held stock is kept while its score ranks within the top ``band`` of the universe;
+    the remaining slots, up to ``ceil(top_quantile * n)``, are filled with the
+    best-ranked stocks of the top quantile that are not already kept. Equal weights.
+    """
+
+    def rule(scores: pd.Series, held: pd.Index) -> pd.Series:
+        order = scores.dropna().sort_values(ascending=False, kind="stable").index
+        n, n_band = math.ceil(top_quantile * len(order)), math.ceil(band * len(order))
+        keep = [s for s in order[:n_band] if s in held][:n]
+        fill = [s for s in order[:n] if s not in keep][: n - len(keep)]
+        chosen = keep + fill
+        return pd.Series(1.0 / len(chosen), index=chosen) if chosen else pd.Series(dtype=float)
+
+    return rule
 
 
 class _Book:
@@ -116,32 +150,33 @@ def _trade_day(
 
 
 def run_backtest(
-    targets: dict[pd.Timestamp, pd.Series],
+    schedule: dict[pd.Timestamp, pd.Series],
+    rule: TargetRule,
     end: pd.Timestamp,
-    market: Market,
-    settings: EngineSettings,
+    market_settings: tuple[Market, EngineSettings],
 ) -> BacktestResult:
     """Run the rebalance loop from the first trade day through ``end``.
 
     Args:
-        targets: Desired weights per trade day (symbol -> weight).
+        schedule: Scores per trade day (symbol -> score), known at the previous close.
+        rule: Turns the scores and the current holdings into target weights.
         end: Last session; the portfolio is sold at its close.
-        market: Returns, average traded value, and price bands.
-        settings: Costs, cap, portfolio size, and limit margin.
+        market_settings: Market data, and costs, cap, portfolio size, and limit margin.
 
     Returns:
         Daily returns and per-trade statistics.
     """
+    market, settings = market_settings
     symbols = market.returns.columns
     sessions = market.returns.index
-    sessions = sessions[(sessions >= min(targets)) & (sessions <= end)]
+    sessions = sessions[(sessions >= min(schedule)) & (sessions <= end)]
     book, daily, trades = _Book(len(symbols)), [], []
     for day in sessions:
         start_equity = book.equity
         gross = book.earn(np.nan_to_num(market.returns.loc[day].to_numpy(), nan=0.0))
         invested_after_returns = float(book.weights.sum())
-        if day in targets:
-            wanted = _target_vector(targets[day], symbols)
+        if day in schedule:
+            wanted = _target_vector(rule(schedule[day], symbols[book.weights > 0]), symbols)
             feasible = constrain(
                 book.weights, wanted, _trade_day(market, day, book.equity, settings)
             )

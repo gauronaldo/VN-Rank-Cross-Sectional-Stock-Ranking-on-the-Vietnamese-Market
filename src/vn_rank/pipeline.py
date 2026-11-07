@@ -134,7 +134,12 @@ def backtest_settings(config: Config) -> runner.BacktestSettings:
         config.project.seed,
     )
     return runner.BacktestSettings(
-        engine, bt.top_quantile, config.label.horizon_days, evaluation.trading_days_per_year, boot
+        engine,
+        bt.top_quantile,
+        config.label.horizon_days,
+        evaluation.trading_days_per_year,
+        boot,
+        bt.turnover_band,
     )
 
 

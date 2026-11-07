@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import itertools
 
 import numpy as np
@@ -77,6 +78,18 @@ def test_backtest_all_ranks_an_oracle_above_the_benchmark() -> None:
     assert SESSIONS.get_loc(last_day) == 71 + HORIZON
     text = runner.render_backtest_markdown(report, ["# Title"], 4)
     assert "## Portfolio metrics (net of costs)" in text
+
+
+def test_band_variant_is_reported_for_the_primary_model() -> None:
+    market, index_close = synthetic_market()
+    preds, entry = predictions(market)
+    settings = dataclasses.replace(SETTINGS, turnover_band=0.2)
+    summary = runner.backtest_all(preds, entry, (market, index_close), settings).summary
+    assert "lightgbm_band" in summary.index
+    assert "momentum_band" not in summary.index
+    assert summary.loc["lightgbm_band", "ann_turnover"] <= summary.loc["lightgbm", "ann_turnover"]
+    gross_gap = summary.loc["lightgbm", "gross_excess_ann_return"]
+    assert gross_gap > summary.loc["lightgbm", "excess_ann_return"]
 
 
 def test_identical_seeds_average_to_the_same_portfolio() -> None:

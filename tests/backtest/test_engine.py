@@ -24,6 +24,11 @@ def market(returns: np.ndarray | None = None, adv: float = 1e15) -> engine.Marke
     )
 
 
+def AS_WEIGHTS(scores: pd.Series, held: pd.Index) -> pd.Series:  # noqa: N802 - constant-like
+    """Target rule for tests whose schedules already hold the target weights."""
+    return scores
+
+
 SETTINGS = engine.EngineSettings(
     COSTS, max_fraction_of_adv=0.1, portfolio_value_vnd=1e10, limit_hit_margin=0.005
 )
@@ -32,7 +37,7 @@ SETTINGS = engine.EngineSettings(
 def test_cost_accounting_matches_hand_computation() -> None:
     """Mandatory test 3: buy A, rotate the whole portfolio into B, then liquidate."""
     targets = {DAYS[1]: pd.Series({"A": 1.0}), DAYS[3]: pd.Series({"B": 1.0})}
-    result = engine.run_backtest(targets, DAYS[4], market(), SETTINGS)
+    result = engine.run_backtest(targets, AS_WEIGHTS, DAYS[4], (market(), SETTINGS))
     buy, sell = 0.0015 + 0.001, 0.0015 + 0.001 + 0.001
     expected = pd.Series([-buy, 0.0, -(sell + buy), -sell], index=DAYS[1:5])
     assert result.daily["net_return"].to_numpy() == pytest.approx(expected.to_numpy(), abs=1e-15)
@@ -47,7 +52,7 @@ def test_weights_drift_with_returns_and_cash_earns_nothing() -> None:
     returns[2] = [0.10, -0.05, 0.0]
     targets = {DAYS[1]: pd.Series({"A": 0.5, "B": 0.25})}  # 25% cash
     no_cost = engine.EngineSettings(costs.CostModel(0, 0, 0), 0.1, 1e10, 0.005)
-    result = engine.run_backtest(targets, DAYS[3], market(returns), no_cost)
+    result = engine.run_backtest(targets, AS_WEIGHTS, DAYS[3], (market(returns), no_cost))
     assert result.daily.loc[DAYS[2], "gross_return"] == pytest.approx(0.5 * 0.10 - 0.25 * 0.05)
     assert result.trades["invested"].iloc[0] == pytest.approx(0.75)
 
@@ -57,6 +62,31 @@ def test_top_quantile_weights_take_the_highest_scores() -> None:
     weights = engine.top_quantile_weights(scores, 0.4)
     assert weights.to_dict() == pytest.approx({"B": 0.5, "E": 0.5})
     assert engine.equal_weights(pd.Index(["X", "Y"])).to_list() == [0.5, 0.5]
+
+
+def test_band_rule_keeps_holdings_inside_the_band() -> None:
+    scores = pd.Series(np.arange(20, 0, -1), index=[f"S{i:02d}" for i in range(20)], dtype=float)
+    rule = engine.band_rule(top_quantile=0.1, band=0.2)  # 2 slots, hold band = top 4
+    assert list(rule(scores, pd.Index([]))) == [0.5, 0.5]
+    assert list(rule(scores, pd.Index([])).index) == ["S00", "S01"]
+    kept = rule(scores, pd.Index(["S03", "S10"]))  # S03 in the band, S10 outside
+    assert list(kept.index) == ["S03", "S00"]
+    assert list(rule(scores, pd.Index(["S02", "S03"])).index) == ["S02", "S03"]
+
+
+def test_band_rule_lowers_turnover_in_the_engine() -> None:
+    rng = np.random.default_rng(0)
+    days = pd.bdate_range("2024-01-01", periods=60)
+    names = [f"S{i:02d}" for i in range(40)]
+    mkt = engine.Market(
+        pd.DataFrame(rng.normal(0, 0.01, (60, 40)), index=days, columns=names),
+        pd.DataFrame(1e15, index=days, columns=names),
+        pd.Series(0.15, index=names),
+    )
+    schedule = {d: pd.Series(rng.random(40), index=names) for d in days[1:55:5]}
+    plain = engine.run_backtest(schedule, engine.top_quantile_rule(0.1), days[59], (mkt, SETTINGS))
+    banded = engine.run_backtest(schedule, engine.band_rule(0.1, 0.2), days[59], (mkt, SETTINGS))
+    assert banded.trades["turnover"].sum() < plain.trades["turnover"].sum()
 
 
 def _day(returns: list[float], caps: list[float] | None = None) -> constraints.TradeDay:
@@ -102,7 +132,7 @@ def test_liquidity_cap_limits_increases_only() -> None:
 def test_cap_uses_portfolio_value_in_vnd() -> None:
     settings = engine.EngineSettings(costs.CostModel(0, 0, 0), 0.1, 1e10, 0.005)
     result = engine.run_backtest(
-        {DAYS[1]: pd.Series({"A": 1.0})}, DAYS[2], market(adv=2e10), settings
+        {DAYS[1]: pd.Series({"A": 1.0})}, AS_WEIGHTS, DAYS[2], (market(adv=2e10), settings)
     )
     assert result.trades["invested"].iloc[0] == pytest.approx(0.2)  # 10% of 20 bn / 10 bn
 

@@ -81,7 +81,7 @@ def variant_row(
     first_seed = predictions[predictions["seed"] == predictions["seed"].min()]
     benchmark = runner.run_equal_weight(first_seed, ctx.entry_dates, ctx.market, ctx.settings)
     results = runner.run_model(predictions, ctx.entry_dates, ctx.market, ctx.settings)
-    portfolio = runner.portfolio_row(results, benchmark.daily["net_return"], ctx.settings)
+    portfolio = runner.portfolio_row(results, benchmark, ctx.settings)
     return {
         "mean_ic": float(daily.mean()), "ic_ci_low": low, "ic_ci_high": high,
         "diff_vs_all": float(diff.mean()), "diff_ci_low": d_low, "diff_ci_high": d_high,
@@ -102,7 +102,7 @@ def cost_grid(predictions: pd.DataFrame, ctx: Context) -> pd.DataFrame:
             settings = dataclasses.replace(ctx.settings, engine=engine)
             ew = runner.run_equal_weight(first_seed, ctx.entry_dates, ctx.market, settings)
             results = runner.run_model(predictions, ctx.entry_dates, ctx.market, settings)
-            row = runner.portfolio_row(results, ew.daily["net_return"], settings)
+            row = runner.portfolio_row(results, ew, settings)
             keep = {k: row[k] for k in ("sharpe", "excess_ann_return", "ann_return")}
             round_trip = 2 * (fee + slip) + tax
             rows.append(

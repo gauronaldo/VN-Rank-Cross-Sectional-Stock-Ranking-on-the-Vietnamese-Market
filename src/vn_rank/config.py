@@ -195,6 +195,7 @@ class BacktestConfig:
     """Portfolio construction, costs, and trading constraints."""
 
     top_quantile: float
+    turnover_band: float | None
     portfolio_value_vnd: float
     limit_hit_margin: float
     costs: CostsConfig
@@ -350,6 +351,10 @@ def _check_rates(universe: UniverseConfig, backtest: BacktestConfig) -> None:
     _require(cap is None or 0 < cap <= 1, f"max_position_fraction_of_adv out of (0, 1]: {cap}")
     _require(0 < backtest.top_quantile <= 1, f"top_quantile out of (0, 1]: {backtest.top_quantile}")
     _require(backtest.portfolio_value_vnd > 0, "portfolio_value_vnd must be > 0")
+    band = backtest.turnover_band
+    _require(
+        band is None or backtest.top_quantile < band <= 1, "turnover_band must be > top_quantile"
+    )
     _require(
         0 <= backtest.limit_hit_margin < min(backtest.price_limits.values()), "limit_hit_margin"
     )

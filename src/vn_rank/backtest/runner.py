@@ -25,9 +25,11 @@ from vn_rank.backtest.engine import (
     BacktestResult,
     EngineSettings,
     Market,
-    equal_weights,
+    TargetRule,
+    band_rule,
+    equal_weight_rule,
     run_backtest,
-    top_quantile_weights,
+    top_quantile_rule,
 )
 from vn_rank.data import universe
 from vn_rank.evaluation import bootstrap, performance
@@ -39,17 +41,23 @@ Schedule = dict[pd.Timestamp, pd.Series]
 EQUAL_WEIGHT = "equal_weight"
 VNINDEX = "vnindex"
 PRIMARY_MODEL = "lightgbm"  # pre-registered primary model (protocol 7)
+BAND_SUFFIX = "_band"  # secondary turnover-control variant of the primary model
 
 
 @dataclasses.dataclass(frozen=True)
 class BacktestSettings:
-    """Engine settings plus portfolio, calendar, and bootstrap conventions."""
+    """Engine settings plus portfolio, calendar, and bootstrap conventions.
+
+    ``turnover_band`` is the hold band of the secondary turnover-control variant
+    (``None`` skips it).
+    """
 
     engine: EngineSettings
     top_quantile: float
     horizon: int
     trading_days: int
     bootstrap: bootstrap.BootstrapSettings
+    turnover_band: float | None = None
 
 
 def build_market(
@@ -76,12 +84,32 @@ def run_model(
     predictions: pd.DataFrame, entry_dates: pd.Series, market: Market, settings: BacktestSettings
 ) -> list[BacktestResult]:
     """One top-quantile backtest per seed of one model's predictions."""
+    rule = top_quantile_rule(settings.top_quantile)
+    return _run_seeds(predictions, entry_dates, (market, settings), rule)
+
+
+def run_band_model(
+    predictions: pd.DataFrame, entry_dates: pd.Series, market: Market, settings: BacktestSettings
+) -> list[BacktestResult]:
+    """One turnover-band backtest per seed (requires ``settings.turnover_band``)."""
+    if settings.turnover_band is None:
+        raise ValueError("turnover_band is not set")
+    rule = band_rule(settings.top_quantile, settings.turnover_band)
+    return _run_seeds(predictions, entry_dates, (market, settings), rule)
+
+
+def _run_seeds(
+    predictions: pd.DataFrame,
+    entry_dates: pd.Series,
+    market_settings: tuple[Market, BacktestSettings],
+    rule: TargetRule,
+) -> list[BacktestResult]:
+    market, settings = market_settings
     results = []
     for _, part in predictions.groupby("seed", sort=True):
         schedule = score_schedule(part, entry_dates, settings.horizon)
-        targets = {d: top_quantile_weights(s, settings.top_quantile) for d, s in schedule.items()}
         end = _last_exit(schedule, market, settings)
-        results.append(run_backtest(targets, end, market, settings.engine))
+        results.append(run_backtest(schedule, rule, end, (market, settings.engine)))
     return results
 
 
@@ -90,8 +118,8 @@ def run_equal_weight(
 ) -> BacktestResult:
     """Equal-weight portfolio of every scored stock on the same schedule."""
     schedule = score_schedule(predictions, entry_dates, settings.horizon)
-    targets = {day: equal_weights(scores.index) for day, scores in schedule.items()}
-    return run_backtest(targets, _last_exit(schedule, market, settings), market, settings.engine)
+    end = _last_exit(schedule, market, settings)
+    return run_backtest(schedule, equal_weight_rule(), end, (market, settings.engine))
 
 
 def _last_exit(schedule: Schedule, market: Market, settings: BacktestSettings) -> pd.Timestamp:
@@ -110,13 +138,18 @@ def average_portfolio(results: list[BacktestResult]) -> tuple[pd.Series, pd.Seri
 
 
 def portfolio_row(
-    results: list[BacktestResult], benchmark: pd.Series, settings: BacktestSettings
+    results: list[BacktestResult], benchmark: BacktestResult, settings: BacktestSettings
 ) -> dict[str, float]:
-    """Metrics of one (seed-averaged) portfolio, its excess over the benchmark, and CIs."""
+    """Metrics of one (seed-averaged) portfolio, its excess over the benchmark, and CIs.
+
+    The excess return is net of both portfolios' costs; ``gross_excess_ann_return``
+    compares them before costs.
+    """
     net, gross, moved = average_portfolio(results)
     days, boot = settings.trading_days, settings.bootstrap
     row = performance.performance_summary(net, moved, days, settings.horizon)
-    excess = (net - benchmark.reindex(net.index)).fillna(0.0)
+    excess = (net - benchmark.daily["net_return"].reindex(net.index)).fillna(0.0)
+    gross_excess = (gross - benchmark.daily["gross_return"].reindex(net.index)).fillna(0.0)
     sharpe_low, sharpe_high = bootstrap.bootstrap_ci(
         net.to_numpy(), bootstrap.sharpe_statistic(days), boot
     )
@@ -133,6 +166,7 @@ def portfolio_row(
         "gross_ann_return": performance.annualized_return(gross, days),
         "gross_sharpe": performance.sharpe_ratio(gross, days),
         "ann_cost": float((gross - net).mean() * days),
+        "gross_excess_ann_return": float(gross_excess.mean() * days),
         "excess_ann_return": float(excess.mean() * days),
         "excess_ci_low": excess_low * days,
         "excess_ci_high": excess_high * days,
@@ -215,17 +249,19 @@ def backtest_all(
     """
     market, index_close = market_and_index
     models = list(dict.fromkeys(predictions["model"]))
-    results = {
-        m: run_model(predictions[predictions["model"] == m], entry_dates, market, settings)
-        for m in models
-    }
-    first = predictions[(predictions["model"] == models[0])]
+    primary = PRIMARY_MODEL if PRIMARY_MODEL in models else models[0]
+    by_model = {m: predictions[predictions["model"] == m] for m in models}
+    results = {m: run_model(p, entry_dates, market, settings) for m, p in by_model.items()}
+    if settings.turnover_band is not None:
+        band = run_band_model(by_model[primary], entry_dates, market, settings)
+        results[primary + BAND_SUFFIX] = band
+    first = by_model[models[0]]
     benchmark = run_equal_weight(
         first[first["seed"] == first["seed"].min()], entry_dates, market, settings
     )
     ew_net = benchmark.daily["net_return"]
-    rows = {m: portfolio_row(r, ew_net, settings) for m, r in results.items()}
-    rows[EQUAL_WEIGHT] = portfolio_row([benchmark], ew_net, settings)
+    rows = {m: portfolio_row(r, benchmark, settings) for m, r in results.items()}
+    rows[EQUAL_WEIGHT] = portfolio_row([benchmark], benchmark, settings)
     index_returns = index_close.pct_change(fill_method=None).reindex(ew_net.index).fillna(0.0)
     index_returns.iloc[0] = 0.0  # positions are opened at the first close
     rows[VNINDEX] = index_row(index_returns, settings)
@@ -237,7 +273,6 @@ def backtest_all(
             for name, daily in curves.items()
         }
     )
-    primary = PRIMARY_MODEL if PRIMARY_MODEL in models else models[0]
     ic = ic_confidence(seed_averaged_ic(predictions), primary, settings)
     summary = pd.DataFrame.from_dict(rows, orient="index").rename_axis("strategy")
     return BacktestReport(summary, ic, yearly, curves)
@@ -247,7 +282,8 @@ _SUMMARY_COLUMNS = {
     "ann_return": "ann. return", "ann_volatility": "ann. vol", "sharpe": "Sharpe",
     "sharpe_ci_low": "Sharpe CI low", "sharpe_ci_high": "Sharpe CI high",
     "max_drawdown": "max DD", "ann_turnover": "turnover / yr", "ann_cost": "cost / yr",
-    "gross_sharpe": "gross Sharpe", "excess_ann_return": "excess vs EW / yr",
+    "gross_sharpe": "gross Sharpe", "gross_excess_ann_return": "gross excess vs EW / yr",
+    "excess_ann_return": "excess vs EW / yr",
     "excess_ci_low": "excess CI low", "excess_ci_high": "excess CI high",
     "avg_holdings": "holdings", "avg_invested": "invested",
 }  # fmt: skip

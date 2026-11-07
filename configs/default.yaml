@@ -111,6 +111,10 @@ evaluation:
 # 2025 broker data: large brokers' effective fee is about 0.16-0.17% (range 0.1-0.3%).
 backtest:
   top_quantile: 0.1             # long-only top decile, equal weight
+  # Secondary turnover-control variant (AGENT.md 3.7): keep a holding while it ranks in the
+  # top 20%, fill vacated slots from the top 10%. Added after the Phase 5 walk-forward
+  # backtest showed 33x annual turnover; the band is the spec's value, not tuned.
+  turnover_band: 0.2
   portfolio_value_vnd: 10000000000.0  # 10 billion VND, sets the liquidity cap in VND
   limit_hit_margin: 0.005       # a close within 0.5 pp of the band counts as limit-locked
   costs:

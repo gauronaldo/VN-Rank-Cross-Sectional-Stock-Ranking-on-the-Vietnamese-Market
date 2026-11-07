@@ -96,6 +96,7 @@ def test_zero_embargo_is_allowed(raw_config: dict[str, Any]) -> None:
         ("evaluation.confidence_level", 1.0, "confidence_level"),
         ("backtest.portfolio_value_vnd", 0.0, "portfolio_value_vnd"),
         ("backtest.limit_hit_margin", 0.2, "limit_hit_margin"),
+        ("backtest.turnover_band", 0.05, "turnover_band"),
         ("ablation.slippages", [], "must not be empty"),
         ("ablation.brokerage_fees", [1.5], "cost rates"),
         ("ablation.liquidity_thresholds_vnd", [-1.0], "thresholds"),
