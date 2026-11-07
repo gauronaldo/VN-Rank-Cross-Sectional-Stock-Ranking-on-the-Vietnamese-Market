@@ -24,6 +24,7 @@ from vn_rank.evaluation.ic import RETURN_COLUMN, SCORE_COLUMN, SignalSettings, s
 from vn_rank.features.builder import feature_groups
 from vn_rank.models import baselines, gbm, linear, mlp, tuning
 from vn_rank.models.base import RankingModel, feature_columns
+from vn_rank.utils.markdown import markdown_table
 from vn_rank.validation import splits
 
 ALL_FOLDS = "all"
@@ -189,13 +190,6 @@ _POOLED_COLUMNS = {
 _TAIL_COLUMNS = {"top_minus_bottom": "Q5-Q1", "signal_autocorr": "signal autocorr"}
 
 
-def _markdown_table(frame: pd.DataFrame, digits: int) -> list[str]:
-    cells = frame.map(lambda v: f"{v:.{digits}f}" if isinstance(v, float) else str(v))
-    header = "| " + " | ".join(map(str, frame.columns)) + " |"
-    rule = "|" + "---|" * len(frame.columns)
-    return [header, rule, *("| " + " | ".join(row) + " |" for row in cells.to_numpy())]
-
-
 def render_results_markdown(table: pd.DataFrame, header: list[str], digits: int) -> str:
     """Markdown report: pooled metrics per model, then mean Rank IC per fold."""
     pooled = table.loc[table["fold"] == ALL_FOLDS].set_index("model")
@@ -207,9 +201,9 @@ def render_results_markdown(table: pd.DataFrame, header: list[str], digits: int)
     per_fold = folds.pivot(index="fold", columns="model", values="mean_ic")
     per_fold = per_fold[list(pooled.index)].reset_index()
     lines = [*header, "", "## All test folds pooled", ""]
-    lines += _markdown_table(pooled_view, digits)
+    lines += markdown_table(pooled_view, digits)
     lines += ["", "## Mean Rank IC per fold", ""]
-    return "\n".join([*lines, *_markdown_table(per_fold, digits), ""])
+    return "\n".join([*lines, *markdown_table(per_fold, digits), ""])
 
 
 def tripwire_breaches(table: pd.DataFrame, mean_limit: float, fold_limit: float) -> list[str]:
