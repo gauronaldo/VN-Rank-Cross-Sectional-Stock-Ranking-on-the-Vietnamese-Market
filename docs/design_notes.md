@@ -236,6 +236,79 @@ table, and the tripwire check, which keeps `cli.py` thin (approved by the author
 MLflow logging lives in `utils/logging.py`. scikit-learn ships no type information, so
 `pyproject.toml` tells mypy to ignore its missing imports.
 
+## MLP (Phase 4)
+
+The network has 2 or 3 hidden layers of equal width with ReLU and dropout, trained with
+AdamW (weight decay) on mini-batches of 4,096 rows to the L2 loss on the rank target. Its
+inputs are the centred feature ranks with the same 0.5 fill as Elastic Net. It is tuned
+with the same Optuna budget as LightGBM (30 trials per fold) over width (16 to 128),
+depth (2 or 3), dropout (0 to 0.5), weight decay (1e-6 to 1e-2), and learning rate (1e-4
+to 1e-2); these ranges were chosen by the agent under the author's standing approval.
+Early stopping watches the inner-validation L2 loss with a patience of 5 epochs (at most
+30), and the refit trains for the best epoch count. Initialization, dropout, and batch
+order all come from the seed, so a fit is deterministic on one machine; it is refit with
+the 5 seeds like LightGBM.
+
+## Backtest (Phase 5)
+
+**Execution.** Scores at the close of `t` are traded at the close of `t + 1`, every
+`h = 5` sessions, which is exactly the label's entry and exit. The top decile (about 32
+stocks) is held at equal weight; drifted weights earn close-to-close returns and cash
+earns nothing. Costs are charged on the traded value on the trade day, and the portfolio
+is sold on the last day (that cost counts too).
+
+**Constraints.** A stock that closed within 0.5 percentage points of its limit-up price
+cannot be bought, one at limit-down cannot be sold, and a position cannot grow beyond
+10% of the stock's 20-day average traded value (known before the trade) at a 10 billion
+VND portfolio. When blocked sales would push weights above 1, the purchases are scaled
+down, so the book is never levered.
+
+**Costs.** Brokerage 0.15% and slippage 0.10% per side, plus the 0.1% selling tax: about
+0.6% per round trip. Large Vietnamese brokers' effective fee was about 0.16-0.17% in
+2025 (range 0.1-0.3%), and the universe trades at least 1 billion VND a day, so 0.10%
+slippage is moderate. Phase 6 varies both.
+
+**Benchmarks and aggregation.** The equal-weight portfolio of every scored stock uses the
+same schedule, costs, and constraints, so the excess return isolates the ranking.
+VNINDEX is a buy-and-hold reference without costs. A stochastic model's portfolio is the
+average of its 5 seed portfolios, and its Sharpe interval comes from that average series.
+
+**Intervals.** All intervals are 95% moving-block bootstrap percentile intervals (20-day
+blocks, 10,000 resamples, seeded) on daily series: mean Rank IC (criterion C1), paired
+Rank IC differences, Sharpe, and daily excess return.
+
+**Module additions.** `backtest/runner.py` builds schedules, runs strategies and
+benchmarks, and renders the report; `pipeline.py` holds the I/O of the `train` and
+`backtest` commands so `cli.py` stays a dispatcher; `utils/markdown.py` renders tables
+without a new dependency.
+
+## Ablation and sensitivity (Phase 6)
+
+Each feature group is dropped in turn and LightGBM is rerun with the unchanged protocol
+(same folds, tuning budget, seeds). The liquidity threshold is varied by rebuilding the
+panel at 0.5, 2, and 5 billion VND, as pre-registered; these runs never replace the
+primary result. The cost grid re-trades the primary predictions, and the equal-weight
+benchmark pays the same costs. The SHAP summary explains the last fold's model, rebuilt
+with the same tuning (deterministic) and seed 0, on 5,000 of its test rows.
+
+## Lockbox and monitoring (Phase 7)
+
+**Final model.** For the lockbox the training window is all development data: labels
+that exit before 2025-10-01, embargoed 10 more sessions, tuned on its last 6 months
+exactly as in walk-forward. Lockbox samples are signal dates from 2025-10-01 whose
+label has matured in the snapshot. Every model is evaluated; C2 refers to LightGBM.
+
+**Run once.** The command needs `--confirm-lockbox`, refuses if the lock file exists or
+the git tree is dirty, and writes the lock file before computing anything. Before the
+real run, the whole train, lockbox, and update chain was exercised on a synthetic
+snapshot in the test suite.
+
+**Update.** The frozen LightGBM boosters (5 seeds) score the newest session; the buy list
+and every score go to `data/live/`, and realized Rank IC is tracked once labels mature.
+Fetching new data means a complete fresh snapshot (`update --fetch`, into a dated
+folder), because adjusted prices change with corporate actions and cannot be appended to
+an older snapshot.
+
 ## Rationale to complete in Phase 8
 
 - Why a 5-day horizon.
