@@ -22,8 +22,13 @@ recorded in ``reports/lockbox_run.lock`` stays verifiable.
 from __future__ import annotations
 
 import logging
+from typing import Any
 
+import numpy as np
 import pandas as pd
+from matplotlib import pyplot as plt
+from matplotlib.axes import Axes
+from matplotlib.figure import Figure
 
 from vn_rank import final, pipeline
 from vn_rank.backtest import runner
@@ -34,8 +39,23 @@ from vn_rank.features import labels
 from vn_rank.utils.markdown import markdown_table
 
 LOW_VOLATILITY_RULES = {"lowvol_vol60": "rank_vol_60", "lowvol_atr14": "rank_atr_14"}
-COMPARED_MODELS = (runner.PRIMARY_MODEL, "elastic_net")
+COMPARED_MODELS = ("momentum", "elastic_net", runner.PRIMARY_MODEL, "mlp")
 REPORT_STEM = "exploratory_low_volatility"
+SUMMARY_FIGURE = "summary.png"
+# Summary figure: models on the Rank IC panel and portfolios on the excess-return panel.
+SUMMARY_MODELS = ("momentum", "elastic_net", runner.PRIMARY_MODEL, "mlp", "lowvol_vol60")
+SUMMARY_PORTFOLIOS = (
+    runner.PRIMARY_MODEL,
+    runner.PRIMARY_MODEL + runner.BAND_SUFFIX,
+    "lowvol_vol60",
+)
+DISPLAY_NAMES = {
+    "momentum": "Momentum", "elastic_net": "Elastic Net", "lightgbm": "LightGBM", "mlp": "MLP",
+    "lowvol_vol60": "Low-vol rule", "lightgbm_band": "LightGBM\nturnover band",
+}  # fmt: skip
+SERIES_COLORS = ("#2a78d6", "#eb6834", "#1baf7a")  # categorical slots 1-3, validated palette
+TEXT_COLOR, MUTED_COLOR, GRID_COLOR = "#0b0b0b", "#52514e", "#e4e3df"
+BAR_WIDTH, BAR_GAP = 0.26, 0.03  # bar width and the surface gap between adjacent bars
 logger = logging.getLogger(__name__)
 
 
@@ -80,9 +100,77 @@ _PORTFOLIO_COLUMNS = {
 }  # fmt: skip
 
 
-def period_section(
-    title: str, report: runner.BacktestReport, settings: runner.BacktestSettings
-) -> list[str]:
+def _style_axis(axis: Axes, title: str) -> None:
+    axis.set_title(title, fontsize=10, color=TEXT_COLOR, loc="left")
+    axis.axhline(0.0, color=MUTED_COLOR, linewidth=0.8)
+    axis.grid(axis="y", color=GRID_COLOR, linewidth=0.6)
+    axis.set_axisbelow(True)
+    for side in ("top", "right"):
+        axis.spines[side].set_visible(False)
+    axis.tick_params(colors=MUTED_COLOR, labelsize=8)
+
+
+def _grouped_bars(axis: Axes, groups: list[str], series: dict[str, pd.DataFrame], fmt: str) -> None:
+    """Grouped bars; each series frame has ``value`` and optional ``low``/``high`` columns."""
+    x = np.arange(len(groups))
+    step = BAR_WIDTH + BAR_GAP
+    start = -step * (len(series) - 1) / 2
+    label_style: dict[str, Any] = {"ha": "center", "fontsize": 6.5, "color": TEXT_COLOR}
+    for i, (label, frame) in enumerate(series.items()):
+        values = frame["value"].to_numpy(dtype=float)
+        low = frame["low"].to_numpy(dtype=float) if "low" in frame else values
+        high = frame["high"].to_numpy(dtype=float) if "high" in frame else values
+        positions = x + start + i * step
+        axis.bar(positions, values, BAR_WIDTH, color=SERIES_COLORS[i], label=label,
+                 yerr=[values - low, high - values] if "low" in frame else None,
+                 error_kw={"ecolor": MUTED_COLOR, "elinewidth": 0.8, "capsize": 2})  # fmt: skip
+        for position, value, top, bottom in zip(positions, values, high, low, strict=True):
+            anchor, offset = (top, (0, 3)) if value >= 0 else (bottom, (0, -9))
+            axis.annotate(format(value, fmt), (position, anchor), xytext=offset,
+                          textcoords="offset points", **label_style)  # fmt: skip
+    axis.set_xticks(x, [DISPLAY_NAMES.get(g, g) for g in groups])
+    axis.margins(y=0.12)
+    axis.legend(fontsize=8, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.13),
+                ncol=len(series))  # fmt: skip
+
+
+def summary_figure(
+    walk_forward: runner.BacktestReport, lockbox: runner.BacktestReport, alphas: pd.DataFrame
+) -> Figure:
+    """Two panels: mean Rank IC with CIs per period, and the walk-forward cost story."""
+    figure, (ic_axis, money_axis) = plt.subplots(1, 2, figsize=(13, 4.8))
+    models = list(SUMMARY_MODELS)
+    ic = {
+        label: report.ic.reindex(models).rename(
+            columns={"mean_ic": "value", "ci_low": "low", "ci_high": "high"}
+        )
+        for label, report in (
+            ("Walk-forward 2022-2025", walk_forward),
+            ("Lockbox 2025-2026", lockbox),
+        )
+    }
+    _grouped_bars(ic_axis, models, ic, ".3f")
+    _style_axis(ic_axis, "Mean Rank IC with 95% CI: a one-line low-volatility rule ties the models")
+    portfolios = list(SUMMARY_PORTFOLIOS)
+    summary = walk_forward.summary.reindex(portfolios)
+    money = {
+        "Excess vs equal weight, before costs": summary[["gross_excess_ann_return"]].set_axis(
+            ["value"], axis=1
+        ),
+        "Excess vs equal weight, after costs": summary[["excess_ann_return"]].set_axis(
+            ["value"], axis=1
+        ),
+        "Alpha after beta, after costs": alphas.reindex(portfolios)[["alpha"]].set_axis(
+            ["value"], axis=1
+        ),
+    }
+    _grouped_bars(money_axis, portfolios, {k: v * 100 for k, v in money.items()}, "+.1f")
+    _style_axis(money_axis, "Walk-forward, % per year: costs erase the edge; no alpha after beta")
+    figure.tight_layout()
+    return figure
+
+
+def period_section(title: str, report: runner.BacktestReport, alphas: pd.DataFrame) -> list[str]:
     """Markdown lines for one period: Rank IC, portfolio metrics, and alpha after beta."""
     portfolio = report.summary.reindex(columns=list(_PORTFOLIO_COLUMNS)).rename(
         columns=_PORTFOLIO_COLUMNS
@@ -100,7 +188,7 @@ def period_section(
         "",
         "Annualized alpha after beta to the equal-weight benchmark (net of costs):",
         "",
-        *markdown_table(alpha_table(report, settings).reset_index(), pipeline.DIGITS),
+        *markdown_table(alphas.reset_index(), pipeline.DIGITS),
         "",
     ]
 
@@ -136,12 +224,18 @@ def exploratory(config: Config) -> int:
         + pipeline.provenance(pipeline.run_info(config), "exploratory"),
         "",
     ]
+    reports, alphas = [], []
     for title, (predictions_file, panel_file, before) in periods.items():
         predictions = low_volatility_predictions(
             storage.read_parquet(processed / predictions_file),
             storage.read_parquet(processed / panel_file),
         )
-        lines += period_section(title, _period_report(config, predictions, before), settings)
-    storage.write_text("\n".join(lines), config.paths.reports_dir / f"{REPORT_STEM}.md")
+        reports.append(_period_report(config, predictions, before))
+        alphas.append(alpha_table(reports[-1], settings))
+        lines += period_section(title, reports[-1], alphas[-1])
+    reports_dir = config.paths.reports_dir
+    storage.write_text("\n".join(lines), reports_dir / f"{REPORT_STEM}.md")
+    figure = summary_figure(reports[0], reports[1], alphas[0])
+    storage.save_figure(figure, reports_dir / SUMMARY_FIGURE, config.project.figure_dpi)
     logger.info("Exploratory:\n%s", "\n".join(lines))
     return 0

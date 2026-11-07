@@ -38,7 +38,7 @@ def test_low_volatility_predictions_use_the_baseline_rows() -> None:
     lightgbm = base.assign(model="lightgbm", seed=0, score=[0.6, 0.4])
     panel = base[["date", "symbol"]].assign(rank_vol_60=[0.9, 0.1], rank_atr_14=[0.2, 0.8])
     out = exploratory.low_volatility_predictions(pd.concat([base, lightgbm]), panel)
-    assert set(out["model"]) == {"lightgbm", "lowvol_vol60", "lowvol_atr14"}
+    assert set(out["model"]) == {"momentum", "lightgbm", "lowvol_vol60", "lowvol_atr14"}
     vol = out[out["model"] == "lowvol_vol60"].set_index("symbol")["score"]
     assert vol.to_dict() == {"A": -0.9, "B": -0.1}  # the calmer stock ranks higher
     assert list(out.columns) == columns
