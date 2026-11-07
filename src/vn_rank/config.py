@@ -35,6 +35,7 @@ class ProjectConfig:
     """Project-wide settings."""
 
     seed: int
+    figure_dpi: int
 
 
 @dataclasses.dataclass(frozen=True)
@@ -60,6 +61,7 @@ class DataConfig:
     max_rows_per_request: int
     max_retries: int
     retry_backoff_seconds: float
+    band_check_tolerance: float
 
 
 @dataclasses.dataclass(frozen=True)
@@ -271,6 +273,8 @@ def _check_misc(config: Config) -> None:
     _require(data.request_interval_seconds > 0, "request_interval_seconds must be > 0")
     _require(data.max_rows_per_request > 0, "max_rows_per_request must be > 0")
     _require(data.max_retries >= 0, "max_retries must be >= 0")
+    _require(0 <= data.band_check_tolerance < 1, "band_check_tolerance must be in [0, 1)")
+    _require(config.project.figure_dpi > 0, "figure_dpi must be > 0")
 
 
 def config_to_dict(config: Config) -> dict[str, Any]:
