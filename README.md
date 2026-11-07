@@ -21,10 +21,16 @@ whether a long-only portfolio built from the ranking survives trading costs.
   return is **-6.4% a year** (CI -19% to +8%). In the lockbox year it is +6.6% a year,
   but the CI again includes zero, and the absolute return is negative because the whole
   universe fell.
-- **Where the signal comes from.** Mostly a low-volatility and liquidity tilt: the ATR
-  rank alone has a Rank IC of -0.061 on walk-forward and -0.104 on the lockbox. The
+- **Where the signal comes from.** Mostly a low-volatility and liquidity tilt. An
+  exploratory check after the lockbox shows that the textbook low-volatility rule (rank
+  stocks by minus their 60-day volatility) matches LightGBM's mean Rank IC (0.055 vs
+  0.058, difference not significant); LightGBM's signal is steadier, not stronger. The
   ranking is strongest at telling which stocks will do worst, which a long-only portfolio
   in Vietnam (no short selling) cannot exploit.
+- **No strategy shows alpha after costs.** The low-volatility portfolio trades 6 times
+  less and beats equal weight by 5.8% a year, but its beta is only 0.35; after adjusting
+  for beta its alpha is +1.8% a year (CI -7.9% to +10.2%). No strategy here has a
+  significantly positive beta-adjusted alpha net of costs.
 
 ## Data
 
@@ -132,6 +138,34 @@ Tables: [`reports/ablation_results.md`](reports/ablation_results.md).
 
 ![SHAP summary](reports/shap_summary.png)
 
+### Exploratory: does LightGBM beat a one-line low-volatility rule?
+
+Run **after** the lockbox (`vn-rank exploratory`), so it changes no pre-registered result.
+`lowvol_vol60` scores a stock by minus its 60-day volatility rank (the textbook rule);
+`lowvol_atr14` uses ATR and was picked after seeing the test blocks, so it is optimistic.
+Same rows, engine, costs, and benchmark as LightGBM; alpha is net of costs after
+adjusting for beta to the equal-weight benchmark.
+
+| Walk-forward | Mean Rank IC [95% CI] | LightGBM minus rule | Turnover / yr | Excess vs EW | Beta | Alpha after beta [95% CI] |
+|---|---|---|---|---|---|---|
+| LightGBM | 0.058 [0.042, 0.076] | — | 33.0x | -6.4% | 0.83 | -7.5% [-17.3%, +4.5%] |
+| LightGBM, turnover band* | — | — | 24.5x | -1.5% | 0.82 | -2.7% [-12.5%, +9.4%] |
+| Low volatility (60-day) | 0.055 [0.015, 0.088] | +0.003 [-0.020, 0.034] | 5.3x | +5.8% | 0.35 | +1.8% [-7.9%, +10.2%] |
+| Low volatility (ATR, post hoc) | 0.061 [0.021, 0.095] | -0.003 [-0.026, 0.029] | 7.4x | +5.7% | 0.34 | +1.6% [-6.2%, +9.0%] |
+
+On the lockbox the picture is the same: the 60-day rule's Rank IC is 0.091 against
+LightGBM's 0.100 (difference +0.009, CI -0.016 to 0.032), and no strategy's
+beta-adjusted alpha has an interval above zero.
+
+**Reading.** The machine-learning models do not rank better on average than the
+low-volatility rule. Their advantage is stability: LightGBM's Rank IC interval is about
+half as wide and positive in 8 of 8 folds (the rule: 7 of 8, from -0.026 to 0.125). The
+low-volatility portfolio's raw excess return comes from a low beta in a falling market
+(2022: -27% against -55% for equal weight), not from skill after adjusting for beta. A
+stronger design would have pre-registered a low-volatility baseline and a beta-adjusted
+excess return. Full tables:
+[`reports/exploratory_low_volatility.md`](reports/exploratory_low_volatility.md).
+
 ### Monitoring
 
 `vn-rank update` scores the newest session with the frozen lockbox model and tracks the
@@ -174,12 +208,19 @@ realized Rank IC once labels mature:
   limit-lock rule from the close-to-close return, and current fee and band rules.
 - **Choices made after seeing results** are labelled: the turnover-band variant (after the
   walk-forward backtest) and the cost defaults (fixed before the backtest was run).
+- **Weak pre-registered baselines:** momentum and reversal have no signal in this market,
+  so beating them says little; the low-volatility comparison above was only added after
+  the lockbox. Excess return over equal weight is not adjusted for beta, which flatters
+  low-beta portfolios; the exploratory table adds the beta-adjusted alpha.
+- **Inference may be optimistic:** the Newey-West lag (4) covers label overlap but not
+  regime persistence. A cruder fold-level test (8 fold means of LightGBM Rank IC: mean
+  0.059, standard deviation 0.028) still gives t of about 6.
 
 ## Reproduction
 
 ```bash
 make setup             # pinned dependencies (uv) and git hooks
-make check             # ruff, mypy --strict, pytest (195 tests)
+make check             # ruff, mypy --strict, pytest (198 tests)
 make download          # vnstock snapshot into data/raw (Community API key required)
 make validate-data     # data-quality report and tickers-per-year figure
 make features          # development panel (prices before the lockbox), about 1 minute
@@ -187,6 +228,7 @@ make train             # walk-forward tuning and scoring of 5 models, about 40 m
 make backtest          # portfolio backtest, about 1 minute
 make ablation          # feature groups, liquidity and cost sensitivity, SHAP, about 25 minutes
 make update            # score the newest session with the frozen model
+make exploratory       # post-lockbox low-volatility comparison (exploratory)
 ```
 
 `make lockbox` exists but refuses to run again: `reports/lockbox_run.lock` records the one
@@ -212,7 +254,7 @@ src/vn_rank/
   evaluation/          Rank IC, performance, block bootstrap
   backtest/            costs, constraints, rebalance loop, runner
   monitoring/          frozen-model scoring and realized Rank IC
-  cli.py, pipeline.py, ablation.py, final.py   command-line entry point and commands
+  cli.py, pipeline.py, ablation.py, final.py, exploratory.py   entry point and commands
 tests/                 mirrors src/ (look-ahead, purge, and cost-accounting tests included)
 docs/                  protocol.md (pre-registered), design_notes.md
 notebooks/             EDA only

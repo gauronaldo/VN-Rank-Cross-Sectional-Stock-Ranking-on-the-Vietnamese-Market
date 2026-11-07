@@ -309,6 +309,20 @@ Fetching new data means a complete fresh snapshot (`update --fetch`, into a date
 folder), because adjusted prices change with corporate actions and cannot be appended to
 an older snapshot.
 
+## Exploratory low-volatility comparison (after the lockbox)
+
+A review of the finished results found two design gaps. The pre-registered baselines
+(momentum, reversal) carry no signal in this market, so beating them says little, while
+the low-volatility effect, well known before the project, explains most of the signal.
+And excess return over equal weight ignores beta, which flatters a low-beta portfolio.
+`vn-rank exploratory` therefore scores two low-volatility rules on exactly LightGBM's
+rows and reports the paired Rank IC difference and the net alpha after beta to the
+equal-weight benchmark (moving-block bootstrap interval, both series resampled with the
+same blocks). The rules are module constants, not config keys, so the config hash in the
+lockbox lock file stays valid. The finding: the textbook rule matches LightGBM's mean
+Rank IC, LightGBM is steadier, and no strategy has a positive beta-adjusted alpha after
+costs. It is labelled exploratory everywhere.
+
 ## Core rationale (Phase 8)
 
 **Why a 5-day horizon.** One trading week is long enough for price–volume effects
