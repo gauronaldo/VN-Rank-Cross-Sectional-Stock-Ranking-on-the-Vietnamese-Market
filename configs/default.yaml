@@ -60,6 +60,7 @@ validation:
   test_block_months: 6
   inner_validation_months: 6    # tuning window = last months of each training window
   embargo_days: 10              # trading days dropped after the purged train end
+  min_stocks_per_date: 50       # dates with fewer eligible stocks are dropped from training and evaluation
 
 models:
   seeds: [0, 1, 2, 3, 4]        # seeds for stochastic models (MLP, bagged LightGBM)

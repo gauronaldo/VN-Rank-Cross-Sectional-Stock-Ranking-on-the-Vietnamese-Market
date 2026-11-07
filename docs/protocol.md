@@ -100,6 +100,8 @@ The spec says "about 18"; the listed table contains 15, and only these 15 are bu
 - **Lockbox boundary [proposed].** No price from the lockbox period is used during
   development: walk-forward test samples whose exit date `t+1+h` falls on or after
   `lockbox_start` are dropped (the last few signal dates of September 2025).
+- **Minimum cross-section.** Signal dates with fewer than `min_stocks_per_date` = 50
+  eligible stocks are dropped from training, tuning, and evaluation.
 - **Tuning.** Optuna runs inside each training window only. The validation set is the last
   6 months of that window, separated from inner training by the same purge and embargo.
   Test blocks are never used for any choice.
@@ -187,3 +189,4 @@ Expressed in Rank IC; Sharpe is never a success criterion.
 | 2026-11-07 | Add the data-treatment rules in Section 2. | Decided by the author after the Phase 1 data-quality report, before any feature or label was built. |
 | 2026-11-07 | Set `min_traded_value_vnd` to 1 billion VND, fixed before any model is fitted; LightGBM is also reported at 0.5, 2, and 5 billion VND in Phase 6 as a sensitivity check that never replaces the primary result. | Universe-size, liquidity, and churn analysis on 2022-01 → 2025-09 (no labels or returns): about 323 eligible stocks per day, a top decile of about 32, and 97% of market traded value. Approved by the author. |
 | 2026-11-07 | Add data-treatment rule 5 (alignment to the VNINDEX calendar). | 0.12% of label windows in the universe spanned more than `1 + h` sessions because of missing rows (mostly suspensions). Approved by the author. |
+| 2026-11-07 | Add `min_stocks_per_date` = 50: signal dates with fewer eligible stocks are dropped from training, tuning, and evaluation (Section 6). | Rank IC on a date with about 11 names is mostly noise. It removes about 5 sessions in early November 2019 and no test date. Approved by the author at the start of Phase 3, before any model was fitted. |

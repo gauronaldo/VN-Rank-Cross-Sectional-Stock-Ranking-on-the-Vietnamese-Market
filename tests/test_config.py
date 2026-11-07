@@ -76,6 +76,7 @@ def test_zero_embargo_is_allowed(raw_config: dict[str, Any]) -> None:
         ("features.return_windows", 5, "expected a list"),
         ("features.macd_fast", 30, "macd_fast must be < macd_slow"),
         ("validation.embargo_days", -1, "embargo_days must be >= 0"),
+        ("validation.min_stocks_per_date", 0, "min_stocks_per_date must be > 0"),
         ("validation.lockbox_start", "2025-10-01", "expected date"),
         ("validation.lockbox_start", dt.date(2025, 9, 30), "lockbox_start"),
         ("validation.walk_forward_start", dt.date(2019, 1, 1), "train_start"),

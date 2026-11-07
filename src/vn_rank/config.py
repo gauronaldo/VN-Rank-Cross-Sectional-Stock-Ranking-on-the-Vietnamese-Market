@@ -112,6 +112,7 @@ class ValidationConfig:
     test_block_months: int
     inner_validation_months: int
     embargo_days: int
+    min_stocks_per_date: int
 
 
 @dataclasses.dataclass(frozen=True)
