@@ -66,13 +66,62 @@ approved the addition at the end of Phase 0.
 5. **After the run.** No change to models, features, or parameters is allowed. Any later
    experiment is labelled exploratory in the README.
 
-## Data source (Phase 0 finding, to be resolved in Phase 1)
+## Data source (Phase 1)
 
-On 2026-11-06 the PyPI project `vnstock` was quarantined ("cannot be installed or modified
-until a security review is complete", since 2026-09-24). The upstream GitHub README says
-generation 5 is distributed from the vendor's own package index on `vnstocks.com`, which
-this build environment cannot reach. `vnstock` is therefore not yet listed in
-`pyproject.toml`. The install route is decided with the user in Phase 1.
+**Installation.** The PyPI project `vnstock` has been quarantined since 2026-09-24, and
+generation 5 is distributed from the vendor index `https://vnstocks.com/api/packages`.
+`pyproject.toml` pins `vnstock==5.2.2` in a separate `data` dependency group, resolved from
+that index with `explicit = true`, so no other package can come from it. The group is a
+default group; on a machine that cannot reach the index, run `uv sync --no-group data`
+(everything except downloading still works, because only `vnstock_client.py` imports
+vnstock, and it does so lazily).
+
+**Account and limits.** Community tier (free API key, stored by `vnstock register` in the
+user profile, never in the repository). `vnstock.usage()` reports 60 requests/minute,
+3,600/hour, 10,000/day, and 100,000/month. The Guest tier (10/minute, 300/day,
+1,000/month) cannot list symbols at all (`EntitlementError`), so it is not usable here.
+`vnstock status` reports that 5.2.2 is licensed until 2027-11-07; results must be
+reproducible from the stored snapshot, not from a re-download.
+
+**Verified against real outputs (2026-11-07, Windows 11, Python 3.11.9, vnstock 5.2.2).**
+
+- `Reference().equity.list_by_exchange(source="vci")` returns 1,755 rows with columns
+  `symbol, exchange, organ_name, organ_short_name, icb_code_lv2` (pandas `string`).
+  Exchange codes: `UPCOM` 809, `HOSE` 408, `HNX` 299, and **`DELISTED` 239**. The
+  exchange is today's, not the historical one.
+- **Delisted symbols have downloadable history** (for example VTL until 2025-10-09, VTS
+  until 2026-08-19). They are included; see the protocol changelog.
+- `Market().equity(symbol).ohlcv(start, end, interval="1D", *, limit, source, count_back,
+  length, floating=2)` returns `time, open, high, low, close, volume` on a `RangeIndex`:
+  `time` is `datetime64[ns, Asia/Ho_Chi_Minh]` stamped 07:00, prices are `float64` in
+  thousand VND, `volume` is `int64`. There is no symbol column. `end` is inclusive.
+- **Rounding.** `floating=2` (the default) rounds adjusted prices to two decimals, which
+  loses precision for low-priced stocks; the downloader passes `floating=None`.
+- **History cap.** Community keeps the last 2,920 calendar days and records
+  `cap_rows_dropped` and `tier_cap_history_days` in `df.attrs`. Listed stocks therefore
+  start on 2018-11-08; the downloader stores these attrs per symbol in `manifest.json`.
+- **VNINDEX** defaults to source `kbs` and to only **1,000 rows** (from 2022-11) with
+  either source. Passing `source="vci"` and `limit` (config `max_rows_per_request`) returns
+  the whole requested window (2,000 rows from 2018-11-01).
+- Some listed symbols are unknown to `vci` (`InputError`, for example BLU and BPW); they
+  are recorded as `failed` in the manifest and reported.
+- Errors: every library error subclasses `VnstockError`, which carries `retryable`,
+  `code`, and `message_en`. The adapter retries when `retryable` is true or on
+  `RateLimitedError`, skips the symbol on `InputError`, `ProviderError`, or `SchemaError`,
+  and stops on anything else (authentication, entitlement, expired release).
+- Batch calls (`equity([...])`) issue one request per symbol and drop the symbol column,
+  so symbols are downloaded one at a time.
+
+**Snapshot design.** Raw data is stored in a canonical schema (`date` as a naive date,
+`symbol`, OHLC, `volume`) under `data/raw/`. `metadata.json` fixes the source, exchanges,
+start, and end on the first run; a resumed run with different settings is refused, so a
+snapshot is never a mix of two download dates. The end date is yesterday in market time,
+so only completed sessions are stored.
+
+**Module split.** The vnstock adapter lives in `data/vnstock_client.py`, separate from the
+orchestration in `data/download.py`, because together they exceeded the 250-line module
+limit and they have different responsibilities (talking to the library versus resumable
+bookkeeping). This file is not in the AGENT.md repository map.
 
 ## Rationale to complete in Phase 8
 

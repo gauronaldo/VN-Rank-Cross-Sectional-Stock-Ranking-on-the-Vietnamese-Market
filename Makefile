@@ -31,7 +31,13 @@ test:  ## Run the test suite
 validate-config:  ## Load and validate CONFIG
 	$(UV) vn-rank --config $(CONFIG) validate-config
 
+download:  ## Download or resume the raw vnstock snapshot (needs a Community API key)
+	$(UV) vn-rank --config $(CONFIG) download
+
+validate-data:  ## Data-quality report and tickers-per-year figure
+	$(UV) vn-rank --config $(CONFIG) validate-data
+
 # Pipeline targets are implemented in later phases (AGENT.md section 7).
-download features train backtest report:
+features train backtest report:
 	@echo "'make $@' is not implemented yet; it is built in a later phase." >&2
 	@exit 1
