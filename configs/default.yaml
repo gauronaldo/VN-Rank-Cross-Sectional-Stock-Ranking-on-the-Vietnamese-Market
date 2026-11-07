@@ -16,9 +16,12 @@ paths:
 data:
   source: vci                   # one adjusted-price source only; never mix vci and kbs
   index_symbol: VNINDEX
-  exchanges: [HOSE, HNX, UPCOM] # exchange codes verified against vnstock in Phase 1
-  history_start: 2018-11-01     # requested start; Community tier caps history at ~8 years
-  request_interval_seconds: 3.2 # throttle for the ~20 requests/minute guest limit
+  # Exchange codes as returned by vnstock (verified in Phase 1). DELISTED holds symbols that
+  # are no longer listed; they are kept to reduce survivorship bias (protocol changelog).
+  exchanges: [HOSE, HNX, UPCOM, DELISTED]
+  history_start: 2018-11-01     # requested start; Community tier caps history at 2,920 days
+  request_interval_seconds: 1.2 # ~50 requests/minute, under the Community limit of 60
+  max_rows_per_request: 10000   # Community row cap; index ohlcv returns only 1,000 rows if unset
   max_retries: 5
   retry_backoff_seconds: 30.0
 
@@ -72,5 +75,6 @@ backtest:
     HOSE: 0.07
     HNX: 0.10
     UPCOM: 0.15
+    DELISTED: 0.15              # original exchange unknown; use the widest band
   position_cap_adv_window: 20
   max_position_fraction_of_adv: null  # Phase 5 decision

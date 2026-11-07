@@ -57,6 +57,7 @@ class DataConfig:
     exchanges: tuple[str, ...]
     history_start: dt.date
     request_interval_seconds: float
+    max_rows_per_request: int
     max_retries: int
     retry_backoff_seconds: float
 
@@ -268,6 +269,7 @@ def _check_misc(config: Config) -> None:
         "backtest.price_limits keys must equal data.exchanges",
     )
     _require(data.request_interval_seconds > 0, "request_interval_seconds must be > 0")
+    _require(data.max_rows_per_request > 0, "max_rows_per_request must be > 0")
     _require(data.max_retries >= 0, "max_retries must be >= 0")
 
 

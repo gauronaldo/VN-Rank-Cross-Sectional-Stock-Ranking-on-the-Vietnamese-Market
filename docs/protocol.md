@@ -18,9 +18,11 @@ forecast price levels or market direction. Accuracy, RMSE, and MAPE are not used
   mixed with `kbs`). Daily OHLCV adjusted for corporate actions, in thousand VND; VNINDEX
   for the trading calendar and as a benchmark.
 - History: as far back as the tier allows (about 8 years, from about 2018-11).
-- The symbol list contains currently listed stocks only, so **survivorship bias** is
-  present. It is mitigated, not removed, by benchmarking against an equal-weight portfolio of
-  the same universe.
+- The symbol list contains currently listed stocks and **239 delisted symbols** (exchange
+  code `DELISTED`), whose history is downloadable (verified 2026-11-07). Delisted symbols are
+  included, which reduces **survivorship bias**; it is not removed, because symbols delisted
+  before the list was compiled may be missing. The equal-weight benchmark of the same
+  universe remains the primary comparison.
 - The data is a snapshot. Download date, source, and vnstock version are recorded in
   metadata. Raw data is never committed.
 
@@ -34,8 +36,9 @@ up to and including `t`:
    `traded_value_window` = 60 trading days ≥ `min_traded_value_vnd` (decided in Phase 2);
 3. volume on `t` is greater than zero.
 
-Exchanges: HOSE, HNX, and UPCoM **[proposed]**; the liquidity filter removes most thinly
-traded names. Traded value is approximate in early years because prices are adjusted.
+Exchanges: HOSE, HNX, UPCoM, and delisted symbols (see the changelog); the liquidity filter
+removes most thinly traded names. The exchange is the one reported today, not the
+historical one. Traded value is approximate in early years because prices are adjusted.
 
 ## 4. Label
 
@@ -164,3 +167,4 @@ Expressed in Rank IC; Sharpe is never a success criterion.
 |---|---|---|
 | 2026-11-06 | Draft created. | Phase 0. |
 | 2026-11-06 | Approved and locked, including all [proposed] items. | End of Phase 0. |
+| 2026-11-07 | Include the 239 `DELISTED` symbols in the data and the universe; the price-limit check uses the widest band (UPCoM, ±15%) for them because their original exchange is unknown. | Phase 1 probe showed their history is available; including them reduces survivorship bias. Approved by the author. |

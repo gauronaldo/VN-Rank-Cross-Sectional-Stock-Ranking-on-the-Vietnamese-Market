@@ -80,6 +80,7 @@ def test_zero_embargo_is_allowed(raw_config: dict[str, Any]) -> None:
         ("validation.lockbox_start", dt.date(2025, 9, 30), "lockbox_start"),
         ("validation.walk_forward_start", dt.date(2019, 1, 1), "train_start"),
         ("data.history_start", dt.date(2020, 1, 1), "history_start"),
+        ("data.max_rows_per_request", 0, "max_rows_per_request"),
         ("backtest.costs.selling_tax", 1.5, "selling_tax must be in"),
         ("backtest.costs.slippage_per_side", -0.001, "slippage_per_side must be in"),
         ("backtest.top_quantile", 0.0, "top_quantile"),
