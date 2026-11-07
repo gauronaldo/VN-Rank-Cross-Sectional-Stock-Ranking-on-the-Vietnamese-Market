@@ -64,6 +64,27 @@ validation:
 
 models:
   seeds: [0, 1, 2, 3, 4]        # seeds for stochastic models (MLP, bagged LightGBM)
+  missing_rank_fill: 0.5        # Elastic Net only (median rank); LightGBM keeps NaN natively
+  elastic_net_max_iter: 10000
+  lightgbm:                     # fixed, not tuned
+    learning_rate: 0.05
+    max_boost_rounds: 1000
+    early_stopping_rounds: 50   # on inner-validation L2 loss
+    bagging_freq: 1             # bagging on every iteration (bagging_fraction is tuned)
+  # Optuna (TPE, seeded with project.seed) inside each training window only; the objective
+  # is mean daily Rank IC on the inner validation window. Approved at the start of Phase 3.
+  tuning:
+    n_trials: 30                # per model per fold
+    elastic_net:
+      alpha: {low: 1.0e-5, high: 0.1, log: true, integer: false}
+      l1_ratio: {low: 0.05, high: 1.0, log: false, integer: false}
+    lightgbm:
+      num_leaves: {low: 8, high: 128, log: true, integer: true}
+      min_child_samples: {low: 100, high: 5000, log: true, integer: true}
+      lambda_l1: {low: 1.0e-3, high: 10.0, log: true, integer: false}
+      lambda_l2: {low: 1.0e-3, high: 100.0, log: true, integer: false}
+      feature_fraction: {low: 0.5, high: 1.0, log: false, integer: false}
+      bagging_fraction: {low: 0.5, high: 1.0, log: false, integer: false}
 
 evaluation:
   n_quantiles: 5                # quintile returns

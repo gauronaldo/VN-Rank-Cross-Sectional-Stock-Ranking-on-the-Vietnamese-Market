@@ -116,10 +116,43 @@ class ValidationConfig:
 
 
 @dataclasses.dataclass(frozen=True)
+class SearchRange:
+    """One Optuna search dimension; ``integer`` draws whole numbers."""
+
+    low: float
+    high: float
+    log: bool
+    integer: bool
+
+
+@dataclasses.dataclass(frozen=True)
+class LightGBMConfig:
+    """LightGBM settings that are fixed, not tuned."""
+
+    learning_rate: float
+    max_boost_rounds: int
+    early_stopping_rounds: int
+    bagging_freq: int
+
+
+@dataclasses.dataclass(frozen=True)
+class TuningConfig:
+    """Optuna budget and search space per model (inner validation window only)."""
+
+    n_trials: int
+    elastic_net: dict[str, SearchRange]
+    lightgbm: dict[str, SearchRange]
+
+
+@dataclasses.dataclass(frozen=True)
 class ModelsConfig:
     """Model-level settings shared by all models."""
 
     seeds: tuple[int, ...]
+    missing_rank_fill: float
+    elastic_net_max_iter: int
+    lightgbm: LightGBMConfig
+    tuning: TuningConfig
 
 
 @dataclasses.dataclass(frozen=True)
@@ -212,11 +245,21 @@ def validate_config(config: Config) -> None:
         ConfigError: If a window is not positive, periods are out of order, a rate is out
             of bounds, or exchanges and price limits disagree.
     """
-    for section in (config.universe, config.label, config.features, config.validation):
+    models = config.models
+    sections: tuple[DataclassInstance, ...] = (
+        config.universe,
+        config.label,
+        config.features,
+        config.validation,
+        models.lightgbm,
+        models.tuning,
+    )
+    for section in sections:
         _check_positive(section)
     _check_periods(config.data.history_start, config.validation)
     _check_rates(config.universe, config.backtest)
     _check_misc(config)
+    _check_search_space({**models.tuning.elastic_net, **models.tuning.lightgbm})
 
 
 def _require(condition: bool, message: str) -> None:
@@ -267,6 +310,8 @@ def _check_misc(config: Config) -> None:
     _require(config.evaluation.n_quantiles >= _MIN_QUANTILES, "evaluation.n_quantiles must be >= 2")
     seeds = config.models.seeds
     _require(len(seeds) > 0 and len(set(seeds)) == len(seeds), "seeds must be non-empty, unique")
+    _require(0 <= config.models.missing_rank_fill <= 1, "missing_rank_fill must be in [0, 1]")
+    _require(config.models.elastic_net_max_iter > 0, "elastic_net_max_iter must be > 0")
     _require(
         set(config.backtest.price_limits) == set(data.exchanges),
         "backtest.price_limits keys must equal data.exchanges",
@@ -276,6 +321,14 @@ def _check_misc(config: Config) -> None:
     _require(data.max_retries >= 0, "max_retries must be >= 0")
     _require(0 <= data.band_check_tolerance < 1, "band_check_tolerance must be in [0, 1)")
     _require(config.project.figure_dpi > 0, "figure_dpi must be > 0")
+
+
+def _check_search_space(space: dict[str, SearchRange]) -> None:
+    for name, dim in space.items():
+        _require(dim.low < dim.high, f"search range {name}: low must be < high")
+        _require(not dim.log or dim.low > 0, f"search range {name}: log scale needs low > 0")
+        whole = float(dim.low).is_integer() and float(dim.high).is_integer()
+        _require(not dim.integer or whole, f"search range {name}: integer bounds must be whole")
 
 
 def config_to_dict(config: Config) -> dict[str, Any]:

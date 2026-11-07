@@ -90,6 +90,13 @@ def test_zero_embargo_is_allowed(raw_config: dict[str, Any]) -> None:
         ("models.seeds", [1, 1], "seeds"),
         ("models.seeds", [], "seeds"),
         ("evaluation.n_quantiles", 1, "n_quantiles"),
+        ("models.missing_rank_fill", 1.5, "missing_rank_fill"),
+        ("models.tuning.n_trials", 0, "n_trials must be > 0"),
+        ("models.lightgbm.learning_rate", 0.0, "learning_rate must be > 0"),
+        ("models.tuning.lightgbm.lambda_l1.low", 20.0, "low must be < high"),
+        ("models.tuning.elastic_net.alpha.low", 0.0, "log scale needs low > 0"),
+        ("models.tuning.lightgbm.num_leaves.low", 8.5, "integer bounds must be whole"),
+        ("models.tuning.lightgbm.num_leaves.log", "yes", "expected bool"),
         ("paths", "data", "expected a mapping"),
     ],
 )
