@@ -30,6 +30,8 @@ DELISTED = "DELISTED"
 STATUS_LISTED, STATUS_DELISTED = "listed", "delisted"
 _SERIES_COLORS = {STATUS_LISTED: "#2a78d6", STATUS_DELISTED: "#eb6834"}
 _TEXT_SECONDARY = "#52514e"
+_LEGEND = {STATUS_LISTED: "listed today", STATUS_DELISTED: "delisted by the snapshot date"}
+_MIN_LABEL_SHARE = 0.04  # segments shorter than this share of the tallest bar get no label
 
 
 @dataclasses.dataclass(frozen=True)
@@ -177,17 +179,20 @@ def plot_tickers_per_year(table: pd.DataFrame) -> Figure:
     axes = figure.add_subplot()
     positions = np.arange(len(table))
     bottom = np.zeros(len(table))
+    min_labelled = _MIN_LABEL_SHARE * table.sum(axis=1).max()
     for status in table.columns:
+        values = table[status].to_numpy()
         bars = axes.bar(
-            positions, table[status], bottom=bottom, width=0.6, label=status,
+            positions, values, bottom=bottom, width=0.6, label=_LEGEND[status],
             color=_SERIES_COLORS[status], edgecolor="white", linewidth=2,
         )  # fmt: skip
-        axes.bar_label(bars, label_type="center", color="white", fontsize=8)
-        bottom = bottom + table[status].to_numpy()
+        labels = [str(v) if v >= min_labelled else "" for v in values]
+        axes.bar_label(bars, labels=labels, label_type="center", color="white", fontsize=8)
+        bottom = bottom + values
     axes.set_title("Symbols with at least one trade per year (first and last years are partial)")
     axes.set_xticks(positions, [str(year) for year in table.index])
     axes.set_ylabel("symbols")
-    axes.legend(frameon=False, loc="upper left")
+    axes.legend(frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.1), ncols=2)
     axes.spines[["top", "right"]].set_visible(False)
     axes.tick_params(colors=_TEXT_SECONDARY)
     axes.grid(axis="y", alpha=0.3)
