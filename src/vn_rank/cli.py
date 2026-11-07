@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from vn_rank import pipeline
+from vn_rank import final, pipeline
 from vn_rank.config import Config, ConfigError, load_config
 from vn_rank.data import download, storage, validate
 from vn_rank.features import builder
@@ -48,6 +48,11 @@ def build_parser() -> argparse.ArgumentParser:
     commands.add_parser("features", help="Build the development panel (before the lockbox).")
     commands.add_parser("train", help="Tune, fit, and score all models on walk-forward folds.")
     commands.add_parser("backtest", help="Backtest walk-forward predictions net of costs.")
+    commands.add_parser("ablation", help="Feature-group ablation, sensitivity checks, SHAP.")
+    lockbox = commands.add_parser("lockbox", help="Evaluate the lockbox period (runs once).")
+    lockbox.add_argument("--confirm-lockbox", action="store_true", help="Required to run.")
+    update = commands.add_parser("update", help="Score the newest session with the frozen model.")
+    update.add_argument("--fetch", action="store_true", help="Download a fresh snapshot first.")
     return parser
 
 
@@ -69,11 +74,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 1
     handlers: dict[str, Callable[[Config], int]] = {
         "validate-config": _validate_config,
-        "download": _download,
+        "download": download_snapshot,
         "validate-data": _validate_data,
         "features": _features,
         "train": pipeline.train,
         "backtest": pipeline.backtest,
+        "ablation": _ablation,
+        "lockbox": lambda c: final.lockbox(c, args.confirm_lockbox),
+        "update": lambda c: final.update(c, args.fetch),
     }
     return handlers[args.command](config)
 
@@ -85,7 +93,8 @@ def _validate_config(config: Config) -> int:
     return 0
 
 
-def _download(config: Config) -> int:
+def download_snapshot(config: Config) -> int:
+    """Download or resume the raw snapshot configured in ``paths.raw_dir``."""
     from vn_rank.data.vnstock_client import VnstockClient  # noqa: PLC0415 - needs vnstock
 
     data, raw_dir = config.data, config.paths.raw_dir
@@ -160,6 +169,12 @@ def _features(config: Config) -> int:
     yearly = per_day.groupby(pd.DatetimeIndex(per_day.index).year).median()
     logger.info("Universe size per year (median):\n%s", yearly.to_string())
     return 0
+
+
+def _ablation(config: Config) -> int:
+    from vn_rank.ablation import ablation  # noqa: PLC0415 - imports shap, only needed here
+
+    return ablation(config)
 
 
 if __name__ == "__main__":

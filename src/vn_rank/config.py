@@ -204,6 +204,16 @@ class BacktestConfig:
 
 
 @dataclasses.dataclass(frozen=True)
+class AblationConfig:
+    """Phase 6 sensitivity grids and the SHAP sample size."""
+
+    liquidity_thresholds_vnd: tuple[float, ...]
+    brokerage_fees: tuple[float, ...]
+    slippages: tuple[float, ...]
+    shap_sample_rows: int
+
+
+@dataclasses.dataclass(frozen=True)
 class Config:
     """Root configuration object."""
 
@@ -217,6 +227,7 @@ class Config:
     models: ModelsConfig
     evaluation: EvaluationConfig
     backtest: BacktestConfig
+    ablation: AblationConfig
 
 
 def load_config(path: Path) -> Config:
@@ -284,6 +295,21 @@ def validate_config(config: Config) -> None:
     _check_misc(config)
     for space in (models.tuning.elastic_net, models.tuning.lightgbm, models.tuning.mlp):
         _check_search_space(space)
+    _check_ablation(config.ablation)
+
+
+def _check_ablation(ablation: AblationConfig) -> None:
+    grids = {
+        "liquidity_thresholds_vnd": ablation.liquidity_thresholds_vnd,
+        "brokerage_fees": ablation.brokerage_fees,
+        "slippages": ablation.slippages,
+    }
+    for name, grid in grids.items():
+        _require(len(grid) > 0, f"ablation.{name} must not be empty")
+    _require(all(t > 0 for t in ablation.liquidity_thresholds_vnd), "thresholds must be > 0")
+    rates = (*ablation.brokerage_fees, *ablation.slippages)
+    _require(all(0 <= r < 1 for r in rates), "ablation cost rates must be in [0, 1)")
+    _require(ablation.shap_sample_rows > 0, "shap_sample_rows must be > 0")
 
 
 def _require(condition: bool, message: str) -> None:

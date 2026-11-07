@@ -124,3 +124,10 @@ backtest:
     DELISTED: 0.15              # original exchange unknown; use the widest band
   position_cap_adv_window: 20
   max_position_fraction_of_adv: 0.1  # at most 10% of the 20-day average traded value per stock
+
+# Phase 6: every run reuses the unchanged walk-forward protocol (LightGBM, same tuning).
+ablation:
+  liquidity_thresholds_vnd: [500000000.0, 2000000000.0, 5000000000.0]  # protocol changelog 2026-11-07
+  brokerage_fees: [0.0005, 0.001, 0.0015, 0.0025, 0.0035]  # cost sensitivity grid, per side
+  slippages: [0.0, 0.0005, 0.001, 0.002, 0.003]             # per side
+  shap_sample_rows: 5000        # test rows of the last fold explained in the SHAP summary

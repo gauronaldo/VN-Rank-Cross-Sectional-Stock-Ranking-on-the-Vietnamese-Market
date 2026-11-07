@@ -112,9 +112,13 @@ def model_specs(config: Config, features: list[str] | None = None) -> list[Model
     ]
 
 
-def _tune(
+def tune_spec(
     spec: ModelSpec, train: pd.DataFrame, config: Config
 ) -> tuple[dict[str, float], tuning.TuningResult | None]:
+    """Tune ``spec`` on the inner split of ``train``; returns refit parameters and the study.
+
+    Models without a search space return empty parameters and no study.
+    """
     if not spec.space:
         return {}, None
     inner, valid = splits.inner_validation_split(train, config.validation)
@@ -128,7 +132,7 @@ def run_fold(
     split: splits.FoldSplit, spec: ModelSpec, config: Config, log_fold: FoldLogger
 ) -> pd.DataFrame:
     """Tune, refit per seed, and score one model on one fold; returns test predictions."""
-    params, result = _tune(spec, split.train, config)
+    params, result = tune_spec(spec, split.train, config)
     frames, test_ic = [], {}
     for seed in spec.seeds:
         model = spec.factory(params, seed).fit(split.train)
