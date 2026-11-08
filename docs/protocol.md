@@ -198,3 +198,54 @@ Expressed in Rank IC; Sharpe is never a success criterion.
 | 2026-11-07 | Lockbox run once at commit `60375ba` (lock file committed). | End of Phase 7. No model, feature, or parameter change is allowed afterwards. |
 | 2026-11-07 | **Exploratory, after the lockbox:** compare LightGBM with low-volatility rules (minus the 60-day volatility rank; minus the ATR rank, chosen post hoc) and report beta-adjusted alpha against equal weight. No pre-registered result, model, or config value changes. | Requested by the author after reviewing the results: the momentum and reversal baselines have no signal, and excess return over equal weight is not adjusted for beta. |
 | 2026-11-08 | The README states the research question in plain words as two parts (ranking, then profit after costs). The question in Section 1 is unchanged. | Readability for non-specialist readers; wording only, the substance and the criteria are the same. |
+| 2026-11-08 | Pre-register the exploratory extension in Section 12 (four literature features, XGBoost, decision rules H1-H3). | Requested by the author; registered before any code was written or run, so the choice of tests cannot follow the results. |
+
+## 12. Exploratory extension: literature features and XGBoost (pre-registered 2026-11-08)
+
+Registered **before any code for it was written or run**. It is exploratory: the lockbox has
+been used, so nothing here can change the results above, and the lockbox is not evaluated.
+
+**Question.** Do price-based features from the anomaly literature, or a second boosted-tree
+library, let a model rank better than the original LightGBM or than a one-line rule?
+
+**New features** (computed from daily close-to-close returns up to and including `t`, then
+ranked within each date among universe members, like the original 15):
+
+| Name | Definition |
+|---|---|
+| `beta_60` | slope of the 60-session OLS regression of the stock's daily return on VNINDEX's daily return |
+| `ivol_60` | standard deviation of the residual of that regression (idiosyncratic volatility) |
+| `max_20` | largest daily return over the last 20 sessions |
+| `skew_60` | sample skewness of daily returns over the last 60 sessions |
+
+Dropped before running, because each would put future information into the past: turnover
+(the snapshot has no point-in-time shares outstanding) and nominal price level (adjusted
+prices in the past depend on later corporate actions).
+
+**Runs** (walk-forward only; same folds, purge, embargo, inner-window Optuna budget of 30
+trials, 5 seeds, costs, and benchmark as the primary study):
+
+1. LightGBM with the 15 original features: the existing primary predictions (not rerun).
+2. LightGBM with 19 features (15 + 4 new).
+3. XGBoost with the 15 original features.
+4. XGBoost with 19 features.
+5. Rules: minus the 60-day volatility rank (as in the earlier exploratory check) and minus
+   the `ivol_60` rank.
+
+XGBoost mirrors the LightGBM setup: L2 loss on the rank target, histogram trees grown
+leaf-wise, learning rate 0.05, at most 1,000 rounds with early stopping after 50; tuned
+over max leaves 8-128 (log), minimum child weight 100-5000 (log), L1 1e-3 to 10 (log), L2
+1e-3 to 100 (log), column and row subsampling 0.5-1.
+
+**Tests decided now** (paired mean Rank IC differences on the same dates, 95% moving-block
+bootstrap):
+
+- **H1, features:** run 2 minus run 1. The new features help only if the lower bound is
+  above 0.
+- **H2, library:** run 3 minus run 1. Expected to include 0.
+- **H3, simple rule:** run 2 minus the 60-day volatility rule. Machine learning beats the
+  rule only if the lower bound is above 0.
+
+Run 4, the `ivol_60` rule, and all portfolio metrics (net excess return, beta-adjusted
+alpha) are reported descriptively, without a claim. Every run is reported, whatever it
+shows, and none is repeated with changed settings.
