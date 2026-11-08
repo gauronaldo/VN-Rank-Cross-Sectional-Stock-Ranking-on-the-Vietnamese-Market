@@ -329,6 +329,27 @@ lockbox lock file stays valid. The finding: the textbook rule matches LightGBM's
 Rank IC, LightGBM is steadier, and no strategy has a positive beta-adjusted alpha after
 costs. It is labelled exploratory everywhere.
 
+## Exploratory extension: literature features and XGBoost (2026-11-08)
+
+Registered in protocol Section 12 (commit `2c12260`) before any code; implemented in
+`ff3d4ff` and run once. The four features come from the anomaly literature on volatility
+and lottery-like stocks: rolling beta and residual (idiosyncratic) volatility against
+VNINDEX over 60 sessions, the largest daily return over 20, and skewness over 60. Two
+candidates were dropped up front because both would leak future information: turnover
+needs point-in-time shares outstanding, which the snapshot lacks, and the nominal price
+level of adjusted prices depends on later corporate actions. XGBoost mirrors the LightGBM
+setup so that only the library differs. Its new windows and search space are module
+constants (`extension.py`, `models/xgb.py`) so the config hash in the lockbox lock file
+stays valid; `xgboost==3.2.0` was added with the author's approval.
+
+Result: H1 holds (the features add about 0.010 Rank IC, and XGBoost replicates the gain);
+H2 shows no library effect; H3 does not hold (the extended model is not significantly
+better than the 60-day volatility rule). One caveat on H1: the features were chosen after
+the earlier analysis showed that volatility drives the signal, so they are informed by
+the same data, even though the tests were fixed before the run. The idiosyncratic
+volatility rule had the best net portfolio, but it is one of several descriptive
+comparisons and carries no claim; only future data (`vn-rank update`) can confirm it.
+
 ## Core rationale (Phase 8)
 
 **Why a 5-day horizon.** One trading week is long enough for price–volume effects

@@ -87,6 +87,16 @@ lockbox. Neither changes a pre-registered result.
 significant); Rank IC falls from 0.070 to 0.045 as the liquidity threshold rises from 0.5
 to 5 billion VND; net excess return breaks even near 0.15% fee plus slippage per side.
 
+**Exploratory extension (pre-registered before any code, walk-forward only).** Four
+features from the anomaly literature (beta, idiosyncratic volatility, maximum daily
+return, skewness) **raise LightGBM's Rank IC from 0.058 to 0.068** (difference +0.010, CI
++0.003 to +0.017); XGBoost gives the same result as LightGBM (difference 0.000). The
+extended model still does not beat the low-volatility rule significantly (+0.013, CI
+-0.014 to +0.048), and a one-line idiosyncratic-volatility rule reaches 0.071 with the
+best net result (+10.2% a year over equal weight; alpha after beta +6.7%, CI -1.6 to
++14.4), reported without a claim. See the
+[extension report](reports/extension_features_xgboost.md).
+
 Detailed reports: [signal](reports/signal_results.md) ·
 [backtest](reports/backtest_results.md) · [lockbox](reports/lockbox_results.md) ·
 [ablation and SHAP](reports/ablation_results.md) ·
