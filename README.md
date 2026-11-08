@@ -5,22 +5,21 @@
 [![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
 [![mypy strict](https://img.shields.io/badge/mypy-strict-2A6DB2)](https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-strict)
-[![tests 207](https://img.shields.io/badge/tests-207-brightgreen)](tests/)
-[![protocol pre-registered](https://img.shields.io/badge/protocol-pre--registered-8A2BE2)](docs/protocol.md)
-[![lockbox opened once](https://img.shields.io/badge/lockbox-opened%20once-555555)](reports/4_lockbox/lockbox_run.lock)
+[![protocol locked before results](https://img.shields.io/badge/protocol-locked%20before%20results-8A2BE2)](docs/protocol.md)
+[![lockbox: fixed models run once](https://img.shields.io/badge/lockbox-fixed%20models%20run%20once-555555)](reports/4_lockbox/lockbox_run.lock)
 
 > **Can past prices and trading volume tell which Vietnamese stocks will do better over the
 > next week, and is that enough to make money after trading costs?**
 >
 > 1. **Ranking:** does the model's ranking match next week's actual ranking? **Yes.**
-> 2. **Profit:** does buying the top-ranked stocks beat buying all of them, after costs? **Not yet.**
+> 2. **Profit:** does buying the top-ranked stocks beat buying all of them, after costs? **Not shown.**
 
 ## The answer
 
-- **The ranking is real.** The pre-registered primary model, LightGBM, has a mean Rank IC
+- **The ranking is real.** The primary model fixed in advance, LightGBM, has a mean Rank IC
   of **0.058** on 3.75 years of walk-forward tests (95% CI 0.042 to 0.076, positive in 8 of
   8 folds) and **0.100** on a held-out year evaluated once (CI 0.082 to 0.113). Both
-  pre-registered criteria hold.
+  success criteria fixed in advance hold.
 
   *Rank IC* is the daily correlation between the model's ranking and the ranking of
   realized returns: 0 is a coin flip, 1 is perfect, and values of 0.02 to 0.05 are usually
@@ -29,16 +28,18 @@
   lockbox) was not touched until every choice was frozen.
 - **It is mostly the low-volatility effect.** A one-line rule (rank stocks by minus their
   60-day volatility) reaches 0.055. The models are steadier than the rule, not stronger.
-- **It does not pay after costs.** Before costs the top decile beats the equal-weight
+- **A profit after costs is not shown.** Before costs the top decile beats the equal-weight
   portfolio by about 12% a year, but the ranking changes fast: about 65% of the portfolio is
-  replaced every week, costs take about 20% a year, and no strategy keeps a positive alpha
-  after costs and after adjusting for beta. The ranking is best at spotting losers, which a
+  replaced every week and costs take about 20% a year. No strategy has an alpha after costs
+  and beta that is significantly above zero (the low-volatility rule's estimate is +1.8% a
+  year, but its interval includes 0). The ranking is best at spotting losers, which a
   long-only portfolio (no short selling in Vietnam) cannot use.
 
 ![Rank IC by model and period, and the walk-forward cost story](reports/summary.png)
 
 The value of the project is the protocol that makes this answer trustworthy: no look-ahead,
-no tuning on test data, and a lockbox opened exactly once.
+no tuning on test data, and a held-out year on which the models fixed in advance were
+evaluated exactly once.
 
 ## Method
 
@@ -65,14 +66,18 @@ walk-forward half-years, then run once on the held-out year.
   purged on the label exit date plus a 10-session embargo; Optuna tunes only on the last 6
   months of each training window. A test rebuilds features on truncated data to prove
   there is no look-ahead.
-- **Lockbox:** 2025-10 → 2026-10, evaluated **once** at the end; a committed lock file
-  ([`lockbox_run.lock`](reports/4_lockbox/lockbox_run.lock)) prevents a second run.
+- **Lockbox:** 2025-10 → 2026-10. The models fixed in advance were evaluated on it
+  **once**, at the end; a committed lock file
+  ([`lockbox_run.lock`](reports/4_lockbox/lockbox_run.lock)) prevents a second run. Rules
+  added later were scored on it descriptively only, so the lockbox is now spent.
 - **Portfolio:** long-only top decile (about 32 stocks), equal weight, rebalanced every 5
   sessions, net of 0.15% brokerage and 0.10% slippage per side plus the 0.1% selling tax,
   with limit-up/limit-down and liquidity constraints.
 
 The criteria, models, and metrics were fixed before any result
-([`docs/protocol.md`](docs/protocol.md), with a dated changelog); the reason for every
+([`docs/protocol.md`](docs/protocol.md), with a dated changelog). The protocol was
+committed to this repository, not registered with an outside service, so the git history
+is its only timestamp; the reason for every
 choice is in [`docs/design_notes.md`](docs/design_notes.md).
 
 ## Results
@@ -96,8 +101,8 @@ choice is in [`docs/design_notes.md`](docs/design_notes.md).
 | LightGBM, turnover band* | 25x | 14.8 | +12.2 | -1.5 [-14.2, +12.9] | 0.82 | -2.7 [-12.5, +9.4] |
 | Low-volatility rule* | 5x | 3.3 | +8.0 | +5.8 [-18.5, +27.1] | 0.35 | +1.8 [-7.9, +10.2] |
 
-**Lockbox (2025-10 → 2026-10).** LightGBM 0.100, Elastic Net 0.102, MLP 0.089, the
-low-volatility rule 0.091, baselines about 0. Before reporting, the high value was checked
+**Lockbox (2025-10 → 2026-10).** LightGBM 0.100, Elastic Net 0.102, MLP 0.089,
+baselines about 0 (the low-volatility rule*, scored there afterwards, 0.091). Before reporting, the high value was checked
 for leakage: the rebuilt panel matches the development panel exactly, the ATR rank alone
 (past prices only) reaches -0.104, and Rank IC is positive in all 13 months. The year
 favoured low-volatility stocks (the equal-weight portfolio lost about 22% a year while
@@ -106,21 +111,16 @@ estimate.
 
 \*Added after seeing results and labelled as such: the turnover band (keep holdings while
 in the top 20%) after the walk-forward backtest, and the low-volatility rule after the
-lockbox. Neither changes a pre-registered result.
+lockbox. Neither changes a result fixed in advance.
 
 **Also tested:** dropping any one feature group changes Rank IC by at most 0.005 (not
 significant); Rank IC falls from 0.070 to 0.045 as the liquidity threshold rises from 0.5
 to 5 billion VND; net excess return breaks even near 0.15% fee plus slippage per side.
 
-**Exploratory extension (pre-registered before any code, walk-forward only).** Four
-features from the anomaly literature (beta, idiosyncratic volatility, maximum daily
-return, skewness) **raise LightGBM's Rank IC from 0.058 to 0.068** (difference +0.010, CI
-+0.003 to +0.017); XGBoost gives the same result as LightGBM (difference 0.000). The
-extended model still does not beat the low-volatility rule significantly (+0.013, CI
--0.014 to +0.048), and a one-line idiosyncratic-volatility rule reaches 0.071 with the
-best net result (+10.2% a year over equal weight; alpha after beta +6.7%, CI -1.6 to
-+14.4), reported without a claim. See the
-[extension report](reports/6_exploratory/extension_features_xgboost.md).
+**After the lockbox** ([exploratory analyses](docs/exploratory.md)): four features from
+the anomaly literature raise Rank IC to 0.068, XGBoost changes nothing, and neither beats
+the low-volatility rule significantly. Putting back the 26 test labels lost to delistings
+changes Rank IC by at most 0.0003.
 
 Detailed reports, one folder per stage ([index](reports/README.md)):
 [data](reports/1_data/) · [walk-forward](reports/2_walk_forward/) ·
@@ -146,25 +146,31 @@ Detailed reports, one folder per stage ([index](reports/README.md)):
   carry wide intervals (the standard error of an annual Sharpe is about 0.6).
 - **Simplified execution:** trades at the close, fixed slippage, and today's exchange (and
   price band) for every date.
-- **Weak pre-registered baselines and no beta adjustment** in the original design; both
+- **Weak baselines and no beta adjustment** in the original design; both
   were added afterwards as exploratory checks.
 
 ## Reproduction
 
 ```bash
 make setup      # pinned dependencies (uv) and git hooks
-make check      # ruff, mypy --strict, pytest (207 tests; also run in CI)
+make check      # ruff, mypy --strict, pytest (also run in CI)
 make download   # vnstock snapshot (free Community API key)
 make features   # development panel, about 1 minute
 make train      # walk-forward tuning and scoring of 5 models, about 40 minutes
 make backtest   # portfolio backtest, about 1 minute
 make ablation   # feature groups, sensitivity, SHAP, about 25 minutes
 make update     # score the newest session with the frozen model
-make extension  # exploratory: 4 literature features and XGBoost, about 15 minutes
+make exploratory extension delisting   # post-lockbox checks (docs/exploratory.md)
 ```
 
-Every run is logged to MLflow; 3,450 configurations were tried in total, including the
-extension. Without access to
+**Data snapshot:** downloaded 2026-11-07 with vnstock 5.2.2 (source `vci`), sessions
+2018-11-01 → 2026-11-06. The data are not committed (vendor licence), and the vendor
+adjusts prices for corporate actions and may revise them, so a new download can differ.
+`make features` logs the development panel's content hash; for this snapshot it is
+`6286af4f79be7b62800c20b6f8fa5a859be4dfba6c8c1d26f8ed45bce81c6093` (449,922 rows). A
+different hash means different data, and the numbers above will not match exactly.
+
+Every run is logged to MLflow; 3,450 configurations were tried in total. Without access to
 the vnstock vendor index, `uv sync --no-group data` installs everything except the
 downloader. On Windows without `make`, run `uv run vn-rank <command>`.
 
@@ -173,8 +179,8 @@ downloader. On Windows without `make`, run `uv run vn-rank <command>`.
 ```
 configs/default.yaml   every tunable value
 src/vn_rank/           data, features, validation, models, evaluation, backtest, monitoring
-tests/                 look-ahead, purge, and cost-accounting tests among 207
-docs/                  protocol.md (pre-registered), design_notes.md
+tests/                 includes look-ahead, purge, and cost-accounting tests
+docs/                  protocol.md (locked before results), design_notes.md, exploratory.md
 notebooks/01_eda.ipynb universe size, missing values, feature distributions and correlations
 reports/               every table and figure, one folder per stage (see reports/README.md)
 ```

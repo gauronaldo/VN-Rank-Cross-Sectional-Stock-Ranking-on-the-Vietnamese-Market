@@ -15,6 +15,7 @@ Layout under ``raw_dir``::
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Any
@@ -125,3 +126,14 @@ def save_figure(figure: Figure, path: Path, dpi: int) -> None:
     """Save a Matplotlib figure, creating parent folders."""
     path.parent.mkdir(parents=True, exist_ok=True)
     figure.savefig(path, dpi=dpi, bbox_inches="tight")
+
+
+def content_sha256(frame: pd.DataFrame, keys: tuple[str, ...] = ("date", "symbol")) -> str:
+    """SHA-256 of a frame's values, independent of row order and of the file format.
+
+    Rows are sorted by ``keys`` and columns by name, then hashed row by row with pandas, so
+    two panels built from the same prices give the same hash even if written differently.
+    """
+    ordered = frame.sort_values(list(keys), kind="stable")[sorted(frame.columns)]
+    rows = pd.util.hash_pandas_object(ordered, index=False).to_numpy()
+    return hashlib.sha256(rows.tobytes()).hexdigest()

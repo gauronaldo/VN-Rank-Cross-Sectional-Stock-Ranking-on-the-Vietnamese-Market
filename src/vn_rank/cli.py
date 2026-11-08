@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from vn_rank import exploratory, final, pipeline
+from vn_rank import delisting, exploratory, final, pipeline
 from vn_rank.config import Config, ConfigError, load_config
 from vn_rank.data import download, storage, validate
 from vn_rank.features import builder
@@ -56,6 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("--fetch", action="store_true", help="Download a fresh snapshot first.")
     commands.add_parser("exploratory", help="Low-volatility baselines vs LightGBM (exploratory).")
     commands.add_parser("extension", help="Pre-registered features and XGBoost (exploratory).")
+    commands.add_parser("delisting", help="Rank IC with labels lost to delisting (exploratory).")
     return parser
 
 
@@ -87,6 +88,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "update": lambda c: final.update(c, args.fetch),
         "exploratory": exploratory.exploratory,
         "extension": _extension,
+        "delisting": delisting.delisting,
     }
     return handlers[args.command](config)
 
@@ -159,6 +161,7 @@ def _features(config: Config) -> int:
     panel = builder.build_panel(raw, calendar, exchange, config)
     out_dir = config.paths.processed_dir
     storage.write_parquet(panel, out_dir / PANEL_FILE)
+    fingerprint = storage.content_sha256(storage.read_parquet(out_dir / PANEL_FILE))
     schema = {
         "columns": builder.describe_columns(config.features),
         "dtypes": {c: str(t) for c, t in panel.dtypes.items()},
@@ -166,12 +169,14 @@ def _features(config: Config) -> int:
         "prices_before": lockbox.date().isoformat(),
         "snapshot": storage.read_json(raw_dir / storage.METADATA_FILE),
         "rows": len(panel),
+        "content_sha256": fingerprint,
     }
     storage.write_json(schema, out_dir / SCHEMA_FILE)
     per_day = panel.groupby("date").size()
     first, last = panel["date"].min().date(), panel["date"].max().date()
     symbols_used = panel["symbol"].nunique()
     logger.info("Panel: %d rows, %d symbols, %s to %s", len(panel), symbols_used, first, last)
+    logger.info("Panel content SHA-256: %s", fingerprint)
     yearly = per_day.groupby(pd.DatetimeIndex(per_day.index).year).median()
     logger.info("Universe size per year (median):\n%s", yearly.to_string())
     return 0

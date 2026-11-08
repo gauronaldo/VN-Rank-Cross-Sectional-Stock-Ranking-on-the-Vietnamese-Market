@@ -65,3 +65,17 @@ def test_read_json_rejects_non_object(tmp_path: Path) -> None:
     path.write_text("[1, 2]", encoding="utf-8")
     with pytest.raises(ValueError, match="JSON object"):
         storage.read_json(path)
+
+
+def test_content_sha256_ignores_row_and_column_order() -> None:
+    frame = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-01-02", "2024-01-01"]),
+            "symbol": ["B", "A"],
+            "x": [1.0, 2.0],
+        }
+    )
+    shuffled = frame.iloc[::-1][["x", "symbol", "date"]]
+    assert storage.content_sha256(frame) == storage.content_sha256(shuffled)
+    changed = frame.assign(x=[1.0, 2.5])
+    assert storage.content_sha256(frame) != storage.content_sha256(changed)
