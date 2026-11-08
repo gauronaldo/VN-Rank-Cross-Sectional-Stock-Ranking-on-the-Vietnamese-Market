@@ -3,7 +3,7 @@ CONFIG ?= configs/default.yaml
 UV := uv run
 
 .PHONY: help setup check lint format typecheck test validate-config \
-        download validate-data features train backtest ablation report lockbox update \
+        download validate-data features train backtest ablation lockbox update \
         exploratory extension
 
 help:  ## List targets
@@ -49,8 +49,6 @@ backtest:  ## Backtest walk-forward predictions net of costs (reports/2_walk_for
 
 ablation:  ## Feature-group ablation, liquidity and cost sensitivity, SHAP
 	$(UV) vn-rank --config $(CONFIG) ablation
-
-report: backtest ablation  ## Regenerate the portfolio and ablation reports from saved predictions
 
 lockbox:  ## One-time lockbox evaluation (refuses if reports/4_lockbox/lockbox_run.lock exists)
 	$(UV) vn-rank --config $(CONFIG) lockbox --confirm-lockbox

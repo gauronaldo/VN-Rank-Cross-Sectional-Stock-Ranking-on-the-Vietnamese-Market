@@ -175,5 +175,6 @@ configs/default.yaml   every tunable value
 src/vn_rank/           data, features, validation, models, evaluation, backtest, monitoring
 tests/                 look-ahead, purge, and cost-accounting tests among 207
 docs/                  protocol.md (pre-registered), design_notes.md
+notebooks/01_eda.ipynb universe size, missing values, feature distributions and correlations
 reports/               every table and figure, one folder per stage (see reports/README.md)
 ```
