@@ -225,3 +225,6 @@ __marimo__/
 # MLflow experiment tracking artifacts.
 /mlruns/
 /mlartifacts/
+
+# Agent working instructions (local only, not part of the project).
+/AGENT.md
