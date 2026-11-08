@@ -54,6 +54,7 @@ def build_parser() -> argparse.ArgumentParser:
     update = commands.add_parser("update", help="Score the newest session with the frozen model.")
     update.add_argument("--fetch", action="store_true", help="Download a fresh snapshot first.")
     commands.add_parser("exploratory", help="Low-volatility baselines vs LightGBM (exploratory).")
+    commands.add_parser("extension", help="Pre-registered features and XGBoost (exploratory).")
     return parser
 
 
@@ -84,6 +85,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         "lockbox": lambda c: final.lockbox(c, args.confirm_lockbox),
         "update": lambda c: final.update(c, args.fetch),
         "exploratory": exploratory.exploratory,
+        "extension": _extension,
     }
     return handlers[args.command](config)
 
@@ -171,6 +173,12 @@ def _features(config: Config) -> int:
     yearly = per_day.groupby(pd.DatetimeIndex(per_day.index).year).median()
     logger.info("Universe size per year (median):\n%s", yearly.to_string())
     return 0
+
+
+def _extension(config: Config) -> int:
+    from vn_rank.extension import extension  # noqa: PLC0415 - imports xgboost, only needed here
+
+    return extension(config)
 
 
 def _ablation(config: Config) -> int:

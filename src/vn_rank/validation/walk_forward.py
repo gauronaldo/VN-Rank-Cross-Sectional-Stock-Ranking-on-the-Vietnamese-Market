@@ -59,7 +59,7 @@ class FoldRecord:
 FoldLogger = Callable[[FoldRecord, pd.DataFrame | None], None]
 
 
-def _split_count(params: dict[str, float], key: str) -> tuple[dict[str, float], int | None]:
+def split_count(params: dict[str, float], key: str) -> tuple[dict[str, float], int | None]:
     """Separate a learned count (rounds, epochs) from the tuned parameters."""
     tuned = {k: v for k, v in params.items() if k != key}
     return tuned, int(params[key]) if key in params else None
@@ -79,12 +79,12 @@ def model_specs(config: Config, features: list[str] | None = None) -> list[Model
     mlp_settings = mlp.MLPSettings(models.mlp, models.missing_rank_fill)
 
     def gbm_factory(params: dict[str, float], seed: int) -> RankingModel:
-        tuned, rounds = _split_count(params, gbm.ROUNDS_KEY)
+        tuned, rounds = split_count(params, gbm.ROUNDS_KEY)
         run = gbm.GBMRun(tuned, seed, rounds)
         return gbm.LightGBMModel(features, run, models.lightgbm, lockbox)
 
     def mlp_factory(params: dict[str, float], seed: int) -> RankingModel:
-        tuned, epochs = _split_count(params, mlp.EPOCHS_KEY)
+        tuned, epochs = split_count(params, mlp.EPOCHS_KEY)
         return mlp.MLPModel(features, mlp.MLPRun(tuned, seed, epochs), mlp_settings, lockbox)
 
     one_seed = (config.project.seed,)
