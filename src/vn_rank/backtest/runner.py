@@ -7,9 +7,10 @@ portfolios (one fifth of capital in each); the seed standard deviation of Sharpe
 reported. Benchmarks use the same schedule: the equal-weight portfolio of every scored
 (eligible) stock, with the same costs and constraints, and VNINDEX (no costs).
 
-Survivorship note: the scored stocks are universe members with a known label, so the
-26 stocks whose label is missing because they delisted inside the window are never
-selected; a delisted holding is carried at its last price until the next trade.
+Look-ahead note: the scored stocks are universe members with a known label, so the 26
+test rows whose label is missing because the stock stopped trading inside the hold are
+never selected, which no investor could know in advance. ``vn-rank delisting`` measures
+the effect (docs/exploratory.md). A holding with no price is carried at its last price.
 """
 
 from __future__ import annotations

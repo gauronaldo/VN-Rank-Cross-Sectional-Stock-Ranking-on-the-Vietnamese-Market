@@ -57,4 +57,4 @@ The held-out year, 2025-10 to 2026-10, evaluated exactly once at the end.
 |---|---|
 | [exploratory_low_volatility.md](6_exploratory/exploratory_low_volatility.md) | The models against a one-line low-volatility rule, with beta-adjusted alpha |
 | [extension_features_xgboost.md](6_exploratory/extension_features_xgboost.md) | Four literature features and XGBoost, tested under decision rules committed before the code |
-| [delisting_sensitivity.md](6_exploratory/delisting_sensitivity.md) | Rank IC with the 26 test labels lost to delistings put back (`vn-rank delisting`) |
+| [delisting_sensitivity.md](6_exploratory/delisting_sensitivity.md) | Rank IC and portfolios with the 26 test labels lost to delistings put back (`vn-rank delisting`) |

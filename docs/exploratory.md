@@ -56,7 +56,22 @@ evaluation, and a model is never penalized for ranking it high. This could flatt
 symbols, 20 dates, 0.009% of the 303,736 scored rows). Putting them back with the return to
 their last close, or with a -100% return, changes mean Rank IC by **at most 0.0003** for
 every model. For the learned models this already assumes the worst case (the lost stock
-gets the highest score on its date), because the fold models were not saved. Nor can the
-main portfolio hold a stock that stops trading: it buys only stocks whose 5-session label
-exists and sells them at that label's exit.
+gets the highest score on its date), because the fold models were not saved.
+
+**The portfolio has the same gap, and there it is a look-ahead.** The backtest chooses only
+among stocks whose label exists, so it never buys a stock that will stop trading inside the
+hold, which no investor could know in advance. Rerunning it with the lost rows eligible
+touches 4 rows on rebalance dates (4 symbols); the learned model is made to buy all of them:
+
+| Net excess vs equal weight, % a year | Reported | Carried at last close | Lost after last close (-100%) |
+|---|---|---|---|
+| LightGBM (worst case: always buys them) | -6.4 | -6.6 | -9.4 |
+| Low-volatility rule (real scores) | +5.8 | +5.8 | +6.2 |
+
+The equal-weight benchmark moves by at most 0.3 points a year. From entry to their last
+close these stocks lost at worst 1% to 25% each, so the last-close column is the realistic
+one and the -100% column a bound. Either way the conclusion is unchanged: LightGBM
+already loses to equal weight after costs, and the look-ahead flattered it by at most about
+3 points a year. The check covers only symbols in the snapshot; the 25 delisted symbols the
+source cannot serve and older delistings are absent (see the README limitations).
 [Report](../reports/6_exploratory/delisting_sensitivity.md).

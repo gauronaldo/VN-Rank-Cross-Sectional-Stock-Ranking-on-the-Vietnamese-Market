@@ -12,6 +12,7 @@ import pytest
 
 from tests.test_final import config_path  # noqa: F401 - fixture with a synthetic snapshot
 from vn_rank import delisting, final
+from vn_rank.backtest.engine import Market
 from vn_rank.cli import main
 from vn_rank.config import load_config
 from vn_rank.utils import report_paths
@@ -26,6 +27,17 @@ def test_return_to_last_close_uses_the_last_real_close() -> None:
     returns = delisting.return_to_last_close(close, alive, rows, entry_lag=1)
     assert returns.iloc[0] == pytest.approx(9.0 / 11.0 - 1)  # entry at the next close
     assert returns.iloc[1] == pytest.approx(0.0)  # stopped before the entry: no move
+
+
+def test_total_loss_market_wipes_out_the_session_after_the_last_close() -> None:
+    returns = pd.DataFrame({"A": [0.0, 0.01, 0.02, np.nan, np.nan, np.nan], "B": 0.01}, DATES)
+    alive = pd.DataFrame({"A": [True] * 3 + [False] * 3, "B": True}, index=DATES)
+    market = Market(returns, returns, pd.Series(0.07, index=["A", "B"]))
+    shocked = delisting.total_loss_market(market, alive, ["A", "B"]).returns
+    assert shocked.at[DATES[3], "A"] == delisting.TOTAL_LOSS
+    assert shocked["A"].iloc[4:].isna().all()
+    assert shocked["B"].equals(returns["B"])  # still trading at the end: unchanged
+    assert np.isnan(returns.at[DATES[3], "A"])  # the input is not modified
 
 
 def _predictions() -> pd.DataFrame:
@@ -79,3 +91,4 @@ def test_delisting_end_to_end(config_path: Path, monkeypatch: pytest.MonkeyPatch
     folder = report_paths.section(config.paths.reports_dir, report_paths.EXPLORATORY)
     report = (folder / f"{delisting.REPORT_STEM}.md").read_text(encoding="utf-8")
     assert "Mean Rank IC with the lost rows put back" in report
+    assert "Portfolios with the lost rows eligible" in report

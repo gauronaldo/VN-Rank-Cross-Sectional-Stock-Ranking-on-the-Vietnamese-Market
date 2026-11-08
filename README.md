@@ -120,7 +120,8 @@ to 5 billion VND; net excess return breaks even near 0.15% fee plus slippage per
 **After the lockbox** ([exploratory analyses](docs/exploratory.md)): four features from
 the anomaly literature raise Rank IC to 0.068, XGBoost changes nothing, and neither beats
 the low-volatility rule significantly. Putting back the 26 test labels lost to delistings
-changes Rank IC by at most 0.0003.
+changes Rank IC by at most 0.0003 and LightGBM's net excess return by 0.1 to 3 points a
+year (see the limitations).
 
 Detailed reports, one folder per stage ([index](reports/README.md)):
 [data](reports/1_data/) · [walk-forward](reports/2_walk_forward/) ·
@@ -146,6 +147,11 @@ Detailed reports, one folder per stage ([index](reports/README.md)):
   carry wide intervals (the standard error of an annual Sharpe is about 0.6).
 - **Simplified execution:** trades at the close, fixed slippage, and today's exchange (and
   price band) for every date.
+- **A small look-ahead in the backtest:** it chooses only among stocks whose 5-day label
+  exists, so it never buys a stock that stops trading during the hold. Letting it buy them
+  (4 rebalance rows) lowers LightGBM's net excess return from -6.4% to -6.6% a year if
+  they are carried at their last price, and to -9.4% if they are a total loss
+  ([check](docs/exploratory.md#3-labels-lost-to-delisting)). The conclusion does not change.
 - **Weak baselines and no beta adjustment** in the original design; both
   were added afterwards as exploratory checks.
 

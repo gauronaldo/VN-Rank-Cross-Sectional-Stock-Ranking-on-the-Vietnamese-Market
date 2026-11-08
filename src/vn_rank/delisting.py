@@ -12,21 +12,31 @@ assumed returns:
 The rules (momentum, reversal, low volatility) score a stock from one feature rank, so
 their scores for these rows are known exactly. The fold models of the learned models were
 not saved, so they get the worst case: the lost row receives the highest score on its date.
-Walk-forward only; the lockbox is spent.
+
+The reported backtest has the same gap, and there it is a small look-ahead: it chooses only
+among stocks whose label exists, so it never buys a stock that will stop trading inside the
+hold, which no investor could know in advance. The portfolio check reruns the backtest with
+the lost rows eligible (the learned models then always buy them), under the same two
+assumptions: the position is carried at its last close, or it is lost on the session after
+the last close. Walk-forward only; the lockbox is spent.
 """
 
 from __future__ import annotations
 
+import dataclasses
 import logging
+from collections.abc import Iterable
 from typing import cast
 
 import pandas as pd
 
 from vn_rank import exploratory, pipeline
 from vn_rank.backtest import runner
+from vn_rank.backtest.engine import Market
 from vn_rank.config import Config
 from vn_rank.data import storage
-from vn_rank.features import builder
+from vn_rank.evaluation.ic import rebalance_dates
+from vn_rank.features import builder, labels
 from vn_rank.models.base import FEATURE_PREFIX
 from vn_rank.utils import report_paths
 from vn_rank.utils.markdown import markdown_table
@@ -34,6 +44,7 @@ from vn_rank.utils.markdown import markdown_table
 REPORT_STEM = "delisting_sensitivity"
 LOW_VOLATILITY = "lowvol_vol60"
 TOTAL_LOSS = -1.0
+PORTFOLIO_MODELS = (runner.PRIMARY_MODEL, LOW_VOLATILITY)
 logger = logging.getLogger(__name__)
 
 
@@ -109,6 +120,52 @@ def sensitivity_table(scenarios: dict[str, pd.DataFrame]) -> pd.DataFrame:
     return means.rename_axis("model").reset_index()
 
 
+def total_loss_market(market: Market, alive: pd.DataFrame, symbols: Iterable[str]) -> Market:
+    """Market data in which each symbol returns -100% on the session after its last real row."""
+    returns = market.returns.copy()
+    for symbol in symbols:
+        position = int(alive[symbol].to_numpy().nonzero()[0].max()) + 1
+        if position < len(returns.index):
+            returns.loc[returns.index[position], symbol] = TOTAL_LOSS
+    return dataclasses.replace(market, returns=returns)
+
+
+def portfolio_table(
+    scenarios: dict[str, tuple[pd.DataFrame, Market]],
+    entry_dates: pd.Series,
+    settings: runner.BacktestSettings,
+) -> pd.DataFrame:
+    """Net return and net excess over equal weight, per strategy and scenario, % a year."""
+    rows = []
+    for name, (predictions, market) in scenarios.items():
+        models = [m for m in PORTFOLIO_MODELS if (predictions["model"] == m).any()]
+        first = predictions[predictions["model"] == models[0]]
+        benchmark = runner.run_equal_weight(
+            first[first["seed"] == first["seed"].min()], entry_dates, market, settings
+        )
+        results = {
+            model: runner.run_model(
+                predictions[predictions["model"] == model], entry_dates, market, settings
+            )
+            for model in models
+        }
+        results[runner.EQUAL_WEIGHT] = [benchmark]
+        for strategy, result in results.items():
+            row = runner.portfolio_row(result, benchmark, settings)
+            rows.append(
+                {
+                    "strategy": strategy,
+                    "scenario": name,
+                    "net": row["ann_return"],
+                    "excess vs EW": row["excess_ann_return"],
+                }
+            )
+    long = pd.DataFrame(rows).melt(["strategy", "scenario"], var_name="metric")
+    wide = long.pivot_table("value", "strategy", ["metric", "scenario"], sort=False)
+    wide.columns = [", ".join(map(str, pair)) for pair in wide.columns.to_flat_index()]
+    return wide.reset_index()
+
+
 def lost_summary(lost: pd.DataFrame, returns: pd.Series) -> pd.DataFrame:
     """One line per symbol: affected test dates and the return to its last close."""
     frame = lost.assign(return_to_last_close=returns)
@@ -149,6 +206,25 @@ def delisting(config: Config) -> int:
         ),
     }
     table = sensitivity_table(scenarios)
+    settings = pipeline.backtest_settings(config)
+    market = runner.build_market(
+        frames,
+        prices.exchange,
+        config.backtest.price_limits,
+        config.backtest.position_cap_adv_window,
+    )
+    markets = {
+        "reported": market,
+        "last close": market,
+        "total loss": total_loss_market(market, frames.alive, lost["symbol"].unique()),
+    }
+    portfolios = portfolio_table(
+        {name: (frame, markets[name]) for name, frame in scenarios.items()},
+        labels.label_entry_dates(prices.calendar, config.label),
+        settings,
+    )
+    signals = rebalance_dates(original["date"], settings.horizon)
+    on_rebalance = lost.loc[lost["date"].isin(signals)]
     n_rows, n_dates = len(original.loc[original["model"] == "momentum"]), original["date"].nunique()
     lines = [
         "# Exploratory: labels lost to delisting during the holding period (walk-forward)",
@@ -167,6 +243,17 @@ def delisting(config: Config) -> int:
         "highest score on its date). `total loss` assumes a -100% return.",
         "",
         *markdown_table(table, pipeline.DIGITS),
+        "",
+        "## Portfolios with the lost rows eligible",
+        "",
+        "The reported backtest chooses only among stocks whose label exists, so it never buys",
+        "a stock that will stop trading inside the hold: a small look-ahead. Here the lost rows",
+        "are eligible on rebalance dates "
+        f"({len(on_rebalance)} rows, {on_rebalance['symbol'].nunique()} symbols); the learned",
+        "model always buys them. `last close` carries the position at its last close;",
+        "`total loss` loses it on the session after the last close. Net of costs, per year.",
+        "",
+        *markdown_table(portfolios, pipeline.DIGITS),
         "",
     ]
     folder = report_paths.section(config.paths.reports_dir, report_paths.EXPLORATORY)
