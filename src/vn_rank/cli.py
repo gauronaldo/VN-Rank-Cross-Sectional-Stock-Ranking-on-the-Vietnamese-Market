@@ -19,6 +19,7 @@ from vn_rank import exploratory, final, pipeline
 from vn_rank.config import Config, ConfigError, load_config
 from vn_rank.data import download, storage, validate
 from vn_rank.features import builder
+from vn_rank.utils import report_paths
 from vn_rank.utils.logging import configure_logging
 
 DEFAULT_CONFIG_PATH = Path("configs/default.yaml")
@@ -137,9 +138,10 @@ def _validate_data(config: Config) -> int:
             s for s, e in manifest.items() if e["status"] == status
         )
     text = validate.render_markdown(report, metadata, REPORT_TOP_N)
-    storage.write_text(text, paths.reports_dir / QUALITY_REPORT_FILE)
+    data_reports = report_paths.section(paths.reports_dir, report_paths.DATA)
+    storage.write_text(text, data_reports / QUALITY_REPORT_FILE)
     figure = validate.plot_tickers_per_year(report.tickers_per_year)
-    storage.save_figure(figure, paths.reports_dir / TICKERS_FIGURE_FILE, config.project.figure_dpi)
+    storage.save_figure(figure, data_reports / TICKERS_FIGURE_FILE, config.project.figure_dpi)
     storage.write_parquet(report.flags, paths.interim_dir / QUALITY_FLAGS_FILE)
     storage.write_parquet(report.coverage.reset_index(), paths.interim_dir / COVERAGE_FILE)
     logger.info("Flags per check:\n%s", report.counts.to_string())

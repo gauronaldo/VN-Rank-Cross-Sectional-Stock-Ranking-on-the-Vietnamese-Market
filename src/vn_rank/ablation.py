@@ -31,6 +31,7 @@ from vn_rank.evaluation import bootstrap
 from vn_rank.features import builder, labels
 from vn_rank.models.base import feature_columns
 from vn_rank.models.gbm import LightGBMModel
+from vn_rank.utils import report_paths
 from vn_rank.utils.logging import MlflowFoldLogger
 from vn_rank.utils.markdown import markdown_table
 from vn_rank.utils.seeds import set_global_seed
@@ -186,7 +187,7 @@ def ablation(config: Config) -> int:
     _write_reports(config, table.rename_axis("variant"), costs, (info, log_fold.n_trials))
     storage.save_figure(
         shap_figure(samples, config),
-        config.paths.reports_dir / SHAP_FIGURE,
+        report_paths.section(config.paths.reports_dir, report_paths.ABLATION) / SHAP_FIGURE,
         config.project.figure_dpi,
     )
     return 0
@@ -196,7 +197,7 @@ def _write_reports(
     config: Config, table: pd.DataFrame, costs: pd.DataFrame, provenance: tuple[dict[str, str], int]
 ) -> None:
     info, n_trials = provenance
-    reports = config.paths.reports_dir
+    reports = report_paths.section(config.paths.reports_dir, report_paths.ABLATION)
     storage.write_text(table.to_csv(), reports / f"{ABLATION_STEM}.csv")
     storage.write_text(costs.to_csv(index=False), reports / f"{ABLATION_STEM}_costs.csv")
     sharpe = costs.pivot(index="brokerage_fee", columns="slippage", values="sharpe")

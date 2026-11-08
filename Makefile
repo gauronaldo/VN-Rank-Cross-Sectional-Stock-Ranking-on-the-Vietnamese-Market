@@ -4,7 +4,7 @@ UV := uv run
 
 .PHONY: help setup check lint format typecheck test validate-config \
         download validate-data features train backtest ablation report lockbox update \
-        exploratory
+        exploratory extension
 
 help:  ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -41,10 +41,10 @@ validate-data:  ## Data-quality report and tickers-per-year figure
 features:  ## Build the development panel (prices before lockbox_start) in data/processed
 	$(UV) vn-rank --config $(CONFIG) features
 
-train:  ## Tune, fit, and score all models on walk-forward folds (reports/signal_results.md)
+train:  ## Tune, fit, and score all models on walk-forward folds (reports/2_walk_forward/signal_results.md)
 	$(UV) vn-rank --config $(CONFIG) train
 
-backtest:  ## Backtest walk-forward predictions net of costs (reports/backtest_results.md)
+backtest:  ## Backtest walk-forward predictions net of costs (reports/2_walk_forward/backtest_results.md)
 	$(UV) vn-rank --config $(CONFIG) backtest
 
 ablation:  ## Feature-group ablation, liquidity and cost sensitivity, SHAP
@@ -52,7 +52,7 @@ ablation:  ## Feature-group ablation, liquidity and cost sensitivity, SHAP
 
 report: backtest ablation  ## Regenerate the portfolio and ablation reports from saved predictions
 
-lockbox:  ## One-time lockbox evaluation (refuses if reports/lockbox_run.lock exists)
+lockbox:  ## One-time lockbox evaluation (refuses if reports/4_lockbox/lockbox_run.lock exists)
 	$(UV) vn-rank --config $(CONFIG) lockbox --confirm-lockbox
 
 update:  ## Score the newest session with the frozen model; track realized Rank IC
@@ -60,3 +60,6 @@ update:  ## Score the newest session with the frozen model; track realized Rank 
 
 exploratory:  ## Post-lockbox low-volatility comparison (exploratory, changes no result)
 	$(UV) vn-rank --config $(CONFIG) exploratory
+
+extension:  ## Pre-registered exploratory extension: literature features and XGBoost
+	$(UV) vn-rank --config $(CONFIG) extension

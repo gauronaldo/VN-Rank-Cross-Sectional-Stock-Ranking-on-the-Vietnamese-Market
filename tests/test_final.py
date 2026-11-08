@@ -106,7 +106,7 @@ def test_train_lockbox_update_end_to_end(
     assert main([*args, "lockbox"]) == 1  # flag missing
     assert main([*args, "lockbox", "--confirm-lockbox"]) == 0
     config = load_config(config_path)
-    reports, processed = config.paths.reports_dir, config.paths.processed_dir
+    reports, processed = final.lockbox_reports(config), config.paths.processed_dir
     lock = storage.read_json(reports / final.LOCK_FILE)
     assert lock["last_matured_signal_date"] == SESSIONS[-7].date().isoformat()
     text = (reports / "lockbox_results.md").read_text(encoding="utf-8")

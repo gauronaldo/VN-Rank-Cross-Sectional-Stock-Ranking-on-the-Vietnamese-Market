@@ -17,6 +17,7 @@ from vn_rank.config import Config, config_from_dict, config_to_dict, load_config
 from vn_rank.evaluation.ic import SignalSettings
 from vn_rank.features.builder import feature_groups
 from vn_rank.models.base import feature_columns
+from vn_rank.utils import report_paths
 from vn_rank.validation import splits, walk_forward
 
 CALENDAR = pd.DatetimeIndex(pd.bdate_range("2020-01-01", "2021-12-31"))
@@ -154,7 +155,9 @@ def test_train_command_end_to_end_trips_on_planted_signal(config: Config, tmp_pa
     (tmp_path / "processed").mkdir()
     synthetic_panel(config).to_parquet(tmp_path / "processed" / "panel.parquet")
     assert main(["--config", str(path), "train"]) == 2
-    report = (tmp_path / "reports" / "signal_results.md").read_text(encoding="utf-8")
+    report = (tmp_path / "reports" / report_paths.WALK_FORWARD / "signal_results.md").read_text(
+        encoding="utf-8"
+    )
     assert "Optuna configurations tried: 12." in report
     assert (tmp_path / "processed" / "predictions.parquet").exists()
     assert (tmp_path / "mlruns" / "mlflow.db").exists()

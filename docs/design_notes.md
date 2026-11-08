@@ -15,8 +15,8 @@ are the newest versions that still support Python 3.11, which holds `numpy` at 2
 the virtual environment is about 6 GB. The project only needs the CPU build. The PyTorch CPU
 index was not reachable from the build environment, so the default wheel is used for now.
 
-**Continuous integration.** `.github/workflows/check.yml` (outside the AGENT.md map,
-added after Phase 8) runs ruff, mypy, and pytest on every push. It uses a Windows runner
+**Continuous integration.** `.github/workflows/check.yml` (outside the original repository
+map, added after Phase 8) runs ruff, mypy, and pytest on every push. It uses a Windows runner
 because the locked PyTorch wheel is CPU-only there, while on Linux it pulls about 3 GB of
 CUDA libraries, and it syncs with `--no-group data`, so mypy ignores the missing vnstock
 import. A fresh clone from GitHub was checked the same way before CI was added.
@@ -43,7 +43,7 @@ though prices are in thousand VND, so the conversion lives in exactly one place 
 
 **Module split.** The generic YAML-to-dataclass parser lives in
 `vn_rank/utils/dataclass_parsing.py`, which keeps `config.py` focused on the schema and its
-constraints. This file is not in the repository map in AGENT.md section 4; the author
+constraints. This file is not in the original repository map; the author
 approved the addition at the end of Phase 0.
 
 ## Lockbox guard (designed in Phase 0, implemented in Phases 3 and 7)
@@ -61,7 +61,7 @@ approved the addition at the end of Phase 0.
    defence in depth on top of the guard.
 4. **Lockbox command (Phase 7).** `vn-rank lockbox --confirm-lockbox`:
    - refuses to run without the flag;
-   - refuses if `reports/lockbox_run.lock` exists;
+   - refuses if `reports/4_lockbox/lockbox_run.lock` exists;
    - refuses on a dirty git working tree, so that the recorded commit identifies the exact
      code.
    - writes the lock file **before** computing any result, so a crash part-way still counts
@@ -127,7 +127,7 @@ so only completed sessions are stored.
 **Module split.** The vnstock adapter lives in `data/vnstock_client.py`, separate from the
 orchestration in `data/download.py`, because together they exceeded the 250-line module
 limit and they have different responsibilities (talking to the library versus resumable
-bookkeeping). This file is not in the AGENT.md repository map.
+bookkeeping). This file is not in the original repository map.
 
 ## Data treatment (decided at the end of Phase 1)
 
@@ -150,7 +150,7 @@ The rules are listed in `docs/protocol.md`, Section 2. The reasons:
   labels and features. After the same illustrative filter, 0.12% of rows are flagged. The
   backtest price-limit constraint (Phase 5) inherits the today's-exchange limitation.
 - **Excluded symbols.** 25 delisted symbols unknown to `vci` and 10 empty ones; they are
-  listed in `reports/data_quality.md`.
+  listed in `reports/1_data/data_quality.md`.
 
 ## Features, universe, and labels (Phase 2)
 

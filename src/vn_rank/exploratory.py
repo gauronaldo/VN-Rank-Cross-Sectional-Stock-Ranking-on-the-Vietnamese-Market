@@ -16,7 +16,7 @@ equal-weight benchmark (a low-volatility portfolio has a low beta, so its raw ex
 return mixes skill with market exposure).
 
 The definitions are module constants rather than config keys, so that the config hash
-recorded in ``reports/lockbox_run.lock`` stays verifiable.
+recorded in ``reports/4_lockbox/lockbox_run.lock`` stays verifiable.
 """
 
 from __future__ import annotations
@@ -36,6 +36,7 @@ from vn_rank.config import Config
 from vn_rank.data import storage
 from vn_rank.evaluation import bootstrap
 from vn_rank.features import labels
+from vn_rank.utils import report_paths
 from vn_rank.utils.markdown import markdown_table
 
 LOW_VOLATILITY_RULES = {"lowvol_vol60": "rank_vol_60", "lowvol_atr14": "rank_atr_14"}
@@ -234,7 +235,8 @@ def exploratory(config: Config) -> int:
         alphas.append(alpha_table(reports[-1], settings))
         lines += period_section(title, reports[-1], alphas[-1])
     reports_dir = config.paths.reports_dir
-    storage.write_text("\n".join(lines), reports_dir / f"{REPORT_STEM}.md")
+    exploratory_dir = report_paths.section(reports_dir, report_paths.EXPLORATORY)
+    storage.write_text("\n".join(lines), exploratory_dir / f"{REPORT_STEM}.md")
     figure = summary_figure(reports[0], reports[1], alphas[0])
     storage.save_figure(figure, reports_dir / SUMMARY_FIGURE, config.project.figure_dpi)
     logger.info("Exploratory:\n%s", "\n".join(lines))

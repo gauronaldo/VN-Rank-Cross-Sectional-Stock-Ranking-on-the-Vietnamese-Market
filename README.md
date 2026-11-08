@@ -1,6 +1,13 @@
 # VN-Rank: cross-sectional stock ranking on the Vietnamese market
 
 [![check](https://github.com/gauronaldo/VN-Rank-Cross-Sectional-Stock-Ranking-on-the-Vietnamese-Market/actions/workflows/check.yml/badge.svg)](https://github.com/gauronaldo/VN-Rank-Cross-Sectional-Stock-Ranking-on-the-Vietnamese-Market/actions/workflows/check.yml)
+![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![mypy strict](https://img.shields.io/badge/mypy-strict-2A6DB2)](https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-strict)
+[![tests 207](https://img.shields.io/badge/tests-207-brightgreen)](tests/)
+[![protocol pre-registered](https://img.shields.io/badge/protocol-pre--registered-8A2BE2)](docs/protocol.md)
+[![lockbox opened once](https://img.shields.io/badge/lockbox-opened%20once-555555)](reports/4_lockbox/lockbox_run.lock)
 
 > **Can past prices and trading volume tell which Vietnamese stocks will do better over the
 > next week, and is that enough to make money after trading costs?**
@@ -11,9 +18,15 @@
 ## The answer
 
 - **The ranking is real.** The pre-registered primary model, LightGBM, has a mean Rank IC
-  of **0.058** on four years of walk-forward tests (95% CI 0.042 to 0.076, positive in 8 of
+  of **0.058** on 3.75 years of walk-forward tests (95% CI 0.042 to 0.076, positive in 8 of
   8 folds) and **0.100** on a held-out year evaluated once (CI 0.082 to 0.113). Both
   pre-registered criteria hold.
+
+  *Rank IC* is the daily correlation between the model's ranking and the ranking of
+  realized returns: 0 is a coin flip, 1 is perfect, and values of 0.02 to 0.05 are usually
+  considered useful for equity signals. *Walk-forward* means the model is retrained on the
+  past and tested on the next half-year, eight times in a row; the *held-out year* (the
+  lockbox) was not touched until every choice was frozen.
 - **It is mostly the low-volatility effect.** A one-line rule (rank stocks by minus their
   60-day volatility) reaches 0.055. The models are steadier than the rule, not stronger.
 - **It does not pay after costs.** Before costs the top decile beats the equal-weight
@@ -29,9 +42,21 @@ no tuning on test data, and a lockbox opened exactly once.
 
 ## Method
 
+```mermaid
+flowchart LR
+    data["Daily prices and volume<br/>1,720 stocks, 2018-2026"] --> universe["Liquid universe<br/>about 320 stocks a day"]
+    universe --> features["15 indicators<br/>ranked within each day"]
+    features --> model["Model scores<br/>every stock"]
+    model --> ranking["1. Ranking<br/>Rank IC against next week's returns"]
+    model --> profit["2. Profit<br/>buy the top 10%, pay costs,<br/>compare with buying all"]
+```
+
+Every step uses only data available on the day; the whole chain is refit and tested on 8
+walk-forward half-years, then run once on the held-out year.
+
 - **Data:** `vnstock` (source `vci`), daily prices adjusted for corporate actions,
   2018-11 → 2026-11, 1,755 listed symbols **including 239 delisted ones** to reduce
-  survivorship bias; 1,720 have data ([data quality](reports/data_quality.md)).
+  survivorship bias; 1,720 have data ([data quality](reports/1_data/data_quality.md)).
 - **Universe:** each day, stocks with 252 sessions of history and a 60-session median traded
   value of at least 1 billion VND (about 320 stocks), using only information up to that day.
 - **Features:** 15 hand-written price–volume indicators in 5 groups, each ranked within its
@@ -41,7 +66,7 @@ no tuning on test data, and a lockbox opened exactly once.
   months of each training window. A test rebuilds features on truncated data to prove
   there is no look-ahead.
 - **Lockbox:** 2025-10 → 2026-10, evaluated **once** at the end; a committed lock file
-  ([`reports/lockbox_run.lock`](reports/lockbox_run.lock)) prevents a second run.
+  ([`lockbox_run.lock`](reports/4_lockbox/lockbox_run.lock)) prevents a second run.
 - **Portfolio:** long-only top decile (about 32 stocks), equal weight, rebalanced every 5
   sessions, net of 0.15% brokerage and 0.10% slippage per side plus the 0.1% selling tax,
   with limit-up/limit-down and liquidity constraints.
@@ -95,13 +120,12 @@ extended model still does not beat the low-volatility rule significantly (+0.013
 -0.014 to +0.048), and a one-line idiosyncratic-volatility rule reaches 0.071 with the
 best net result (+10.2% a year over equal weight; alpha after beta +6.7%, CI -1.6 to
 +14.4), reported without a claim. See the
-[extension report](reports/extension_features_xgboost.md).
+[extension report](reports/6_exploratory/extension_features_xgboost.md).
 
-Detailed reports: [signal](reports/signal_results.md) ·
-[backtest](reports/backtest_results.md) · [lockbox](reports/lockbox_results.md) ·
-[ablation and SHAP](reports/ablation_results.md) ·
-[low-volatility comparison](reports/exploratory_low_volatility.md) ·
-[equity curves](reports/equity_curves.png) · [monitoring](reports/realized_ic.png)
+Detailed reports, one folder per stage ([index](reports/README.md)):
+[data](reports/1_data/) · [walk-forward](reports/2_walk_forward/) ·
+[ablation and SHAP](reports/3_ablation/) · [lockbox](reports/4_lockbox/) ·
+[monitoring](reports/5_monitoring/) · [exploratory](reports/6_exploratory/)
 
 ## Metric definitions
 
@@ -136,9 +160,11 @@ make train      # walk-forward tuning and scoring of 5 models, about 40 minutes
 make backtest   # portfolio backtest, about 1 minute
 make ablation   # feature groups, sensitivity, SHAP, about 25 minutes
 make update     # score the newest session with the frozen model
+make extension  # exploratory: 4 literature features and XGBoost, about 15 minutes
 ```
 
-Every run is logged to MLflow; 2,730 configurations were tried in total. Without access to
+Every run is logged to MLflow; 3,450 configurations were tried in total, including the
+extension. Without access to
 the vnstock vendor index, `uv sync --no-group data` installs everything except the
 downloader. On Windows without `make`, run `uv run vn-rank <command>`.
 
@@ -149,5 +175,5 @@ configs/default.yaml   every tunable value
 src/vn_rank/           data, features, validation, models, evaluation, backtest, monitoring
 tests/                 look-ahead, purge, and cost-accounting tests among 207
 docs/                  protocol.md (pre-registered), design_notes.md
-reports/               every table and figure referenced above
+reports/               every table and figure, one folder per stage (see reports/README.md)
 ```

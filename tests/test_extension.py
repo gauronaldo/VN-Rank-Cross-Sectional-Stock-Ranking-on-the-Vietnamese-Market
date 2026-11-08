@@ -16,6 +16,7 @@ from vn_rank import extension, final
 from vn_rank.cli import main
 from vn_rank.config import load_config
 from vn_rank.data import storage
+from vn_rank.utils import report_paths
 
 
 def test_paired_tests_report_direction_and_verdict() -> None:
@@ -47,6 +48,7 @@ def test_extension_end_to_end(config_path: Path, monkeypatch: pytest.MonkeyPatch
     assert set(predictions["model"]) == expected
     rows = predictions.groupby("model").size()
     assert rows["lowvol_vol60"] == rows["ivol_rule"]
-    report = (config.paths.reports_dir / f"{extension.REPORT_STEM}.md").read_text(encoding="utf-8")
+    folder = report_paths.section(config.paths.reports_dir, report_paths.EXPLORATORY)
+    report = (folder / f"{extension.REPORT_STEM}.md").read_text(encoding="utf-8")
     for test in ("H1 features", "H2 library", "H3 beats rule"):
         assert test in report

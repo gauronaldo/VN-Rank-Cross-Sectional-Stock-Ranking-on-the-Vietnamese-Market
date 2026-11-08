@@ -32,6 +32,7 @@ from vn_rank.features.transforms import cross_sectional_rank
 from vn_rank.models import xgb
 from vn_rank.models.base import FEATURE_PREFIX, RankingModel, feature_columns
 from vn_rank.models.gbm import ROUNDS_KEY, GBMRun
+from vn_rank.utils import report_paths
 from vn_rank.utils.logging import MlflowFoldLogger
 from vn_rank.utils.markdown import markdown_table
 from vn_rank.validation import splits, walk_forward
@@ -228,5 +229,6 @@ def _report(
         *markdown_table(portfolio.reset_index(), pipeline.DIGITS),
         "",
     ]
-    storage.write_text("\n".join(lines), config.paths.reports_dir / f"{REPORT_STEM}.md")
+    exploratory_dir = report_paths.section(config.paths.reports_dir, report_paths.EXPLORATORY)
+    storage.write_text("\n".join(lines), exploratory_dir / f"{REPORT_STEM}.md")
     logger.info("Extension:\n%s", "\n".join(lines))

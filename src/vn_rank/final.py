@@ -2,7 +2,7 @@
 
 ``lockbox`` (``vn-rank lockbox --confirm-lockbox``) runs exactly once:
 
-1. refuses without the flag, if ``reports/lockbox_run.lock`` exists, or on a dirty git
+1. refuses without the flag, if ``reports/4_lockbox/lockbox_run.lock`` exists, or on a dirty git
    working tree (so the recorded commit identifies the exact code);
 2. writes the lock file **before** computing anything, so a crash still counts as the
    one run;
@@ -39,6 +39,7 @@ from vn_rank.features import builder, labels
 from vn_rank.models.base import feature_columns
 from vn_rank.models.gbm import LightGBMModel
 from vn_rank.monitoring import update as monitor
+from vn_rank.utils import report_paths
 from vn_rank.utils.markdown import markdown_table
 from vn_rank.utils.seeds import set_global_seed
 from vn_rank.validation import splits, walk_forward
@@ -56,6 +57,11 @@ REALIZED_FIGURE = "realized_ic.png"
 ROLLING_WINDOW = 20
 TRIALS_KEY = "optuna_trials"
 logger = logging.getLogger(__name__)
+
+
+def lockbox_reports(config: Config) -> Path:
+    """Folder of the lockbox reports and of the lock file that prevents a second run."""
+    return report_paths.section(config.paths.reports_dir, report_paths.LOCKBOX)
 
 
 class LockboxRefusedError(RuntimeError):
@@ -152,7 +158,7 @@ def _load_boosters(directory: Path) -> tuple[list[lgb.Booster], list[str]]:
 
 def lockbox(config: Config, confirmed: bool) -> int:
     """Run the lockbox evaluation once (see the module docstring)."""
-    lock_path = config.paths.reports_dir / LOCK_FILE
+    lock_path = lockbox_reports(config) / LOCK_FILE
     try:
         check_preconditions(lock_path, confirmed)
     except LockboxRefusedError as exc:
@@ -227,7 +233,7 @@ def _report_lockbox(
         "",
         runner.render_backtest_markdown(report, ["## Lockbox backtest"], pipeline.DIGITS),
     ]
-    reports = config.paths.reports_dir
+    reports = lockbox_reports(config)
     storage.write_text("\n".join(lines), reports / f"{LOCKBOX_STEM}.md")
     storage.write_text(report.summary.to_csv(), reports / f"{LOCKBOX_STEM}.csv")
     figure = runner.plot_equity(report.curves, "Lockbox (2025-10 onward), net of costs")
@@ -288,7 +294,7 @@ def update(config: Config, fetch: bool) -> int:
 
 
 def _reference_ics(config: Config) -> dict[str, float]:
-    reports = config.paths.reports_dir
+    reports = report_paths.section(config.paths.reports_dir, report_paths.WALK_FORWARD)
     signal = pd.read_csv(reports / f"{pipeline.RESULTS_STEM}.csv")
     row = signal[
         (signal["model"] == runner.PRIMARY_MODEL) & (signal["fold"] == walk_forward.ALL_FOLDS)

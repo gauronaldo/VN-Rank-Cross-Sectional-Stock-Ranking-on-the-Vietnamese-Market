@@ -23,6 +23,7 @@ from vn_rank.data import storage
 from vn_rank.evaluation.bootstrap import BootstrapSettings
 from vn_rank.evaluation.ic import SignalSettings
 from vn_rank.features import builder, labels
+from vn_rank.utils import report_paths
 from vn_rank.utils.logging import MlflowFoldLogger
 from vn_rank.utils.seeds import set_global_seed
 from vn_rank.validation import splits, walk_forward
@@ -96,7 +97,7 @@ def train(config: Config) -> int:
     storage.write_parquet(predictions, config.paths.processed_dir / PREDICTIONS_FILE)
     signal = SignalSettings(config.label.horizon_days, config.evaluation.n_quantiles)
     table = walk_forward.results_table(predictions, signal)
-    reports = config.paths.reports_dir
+    reports = report_paths.section(config.paths.reports_dir, report_paths.WALK_FORWARD)
     storage.write_text(table.to_csv(index=False), reports / f"{RESULTS_STEM}.csv")
     header = [
         "# Signal-level results on walk-forward folds",
@@ -159,7 +160,8 @@ def backtest(config: Config) -> int:
     report = runner.backtest_all(
         predictions, entry_dates, (market, prices.index_close), backtest_settings(config)
     )
-    reports, info = config.paths.reports_dir, run_info(config)
+    reports = report_paths.section(config.paths.reports_dir, report_paths.WALK_FORWARD)
+    info = run_info(config)
     storage.write_text(report.summary.to_csv(), reports / f"{BACKTEST_STEM}.csv")
     storage.write_text(report.yearly.to_csv(), reports / f"{BACKTEST_STEM}_yearly.csv")
     storage.write_parquet(

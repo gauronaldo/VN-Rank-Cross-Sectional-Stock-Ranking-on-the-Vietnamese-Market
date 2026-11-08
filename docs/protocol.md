@@ -199,6 +199,7 @@ Expressed in Rank IC; Sharpe is never a success criterion.
 | 2026-11-07 | **Exploratory, after the lockbox:** compare LightGBM with low-volatility rules (minus the 60-day volatility rank; minus the ATR rank, chosen post hoc) and report beta-adjusted alpha against equal weight. No pre-registered result, model, or config value changes. | Requested by the author after reviewing the results: the momentum and reversal baselines have no signal, and excess return over equal weight is not adjusted for beta. |
 | 2026-11-08 | The README states the research question in plain words as two parts (ranking, then profit after costs). The question in Section 1 is unchanged. | Readability for non-specialist readers; wording only, the substance and the criteria are the same. |
 | 2026-11-08 | Pre-register the exploratory extension in Section 12 (four literature features, XGBoost, decision rules H1-H3). | Requested by the author; registered before any code was written or run, so the choice of tests cannot follow the results. |
+| 2026-11-08 | Group `reports/` into one folder per stage (`1_data` to `6_exploratory`, index in `reports/README.md`); the lock file moves to `reports/4_lockbox/`. | Readability. Files were moved with `git mv` and their contents are unchanged, including the lock file; the lockbox guard checks the new path, so a second run is still refused. |
 
 ## 12. Exploratory extension: literature features and XGBoost (pre-registered 2026-11-08)
 
