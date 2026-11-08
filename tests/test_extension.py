@@ -1,4 +1,4 @@
-"""Tests for the pre-registered extension: paired tests and the command end to end."""
+"""Tests for the exploratory extension (protocol Section 12) and its command."""
 
 from __future__ import annotations
 

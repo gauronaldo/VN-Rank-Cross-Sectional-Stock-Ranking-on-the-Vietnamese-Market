@@ -47,7 +47,7 @@ def test_predict_needs_fit_handles_missing_ranks_and_no_target() -> None:
     assert np.isfinite(model.predict(scored)).all()
 
 
-def test_search_space_mirrors_the_registered_ranges() -> None:
+def test_search_space_mirrors_the_protocol_ranges() -> None:
     assert set(xgb.SEARCH_SPACE) == set(PARAMS)
     assert xgb.SEARCH_SPACE["max_leaves"].integer
     assert (

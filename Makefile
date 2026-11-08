@@ -59,7 +59,7 @@ update:  ## Score the newest session with the frozen model; track realized Rank 
 exploratory:  ## Post-lockbox low-volatility comparison (exploratory, changes no result)
 	$(UV) vn-rank --config $(CONFIG) exploratory
 
-extension:  ## Pre-registered exploratory extension: literature features and XGBoost
+extension:  ## Exploratory extension fixed in protocol Section 12: literature features and XGBoost
 	$(UV) vn-rank --config $(CONFIG) extension
 
 delisting:  ## Exploratory: Rank IC with labels lost to delisting put back

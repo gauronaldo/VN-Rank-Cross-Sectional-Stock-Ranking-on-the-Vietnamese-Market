@@ -55,7 +55,7 @@ def build_parser() -> argparse.ArgumentParser:
     update = commands.add_parser("update", help="Score the newest session with the frozen model.")
     update.add_argument("--fetch", action="store_true", help="Download a fresh snapshot first.")
     commands.add_parser("exploratory", help="Low-volatility baselines vs LightGBM (exploratory).")
-    commands.add_parser("extension", help="Pre-registered features and XGBoost (exploratory).")
+    commands.add_parser("extension", help="Protocol Section 12 features and XGBoost (exploratory).")
     commands.add_parser("delisting", help="Rank IC with labels lost to delisting (exploratory).")
     return parser
 

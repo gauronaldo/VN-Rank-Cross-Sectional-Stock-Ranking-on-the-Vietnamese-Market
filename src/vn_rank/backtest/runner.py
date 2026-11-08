@@ -40,7 +40,7 @@ from vn_rank.utils.markdown import markdown_table
 Schedule = dict[pd.Timestamp, pd.Series]
 EQUAL_WEIGHT = "equal_weight"
 VNINDEX = "vnindex"
-PRIMARY_MODEL = "lightgbm"  # pre-registered primary model (protocol 7)
+PRIMARY_MODEL = "lightgbm"  # primary model fixed in advance (protocol 7)
 BAND_SUFFIX = "_band"  # secondary turnover-control variant of the primary model
 
 

@@ -41,7 +41,7 @@ The held-out year, 2025-10 to 2026-10, evaluated exactly once at the end.
 
 | File | What it shows |
 |---|---|
-| [lockbox_results.md](4_lockbox/lockbox_results.md) | The pre-registered criteria, Rank IC, and portfolios on the lockbox, with the frozen hyperparameters |
+| [lockbox_results.md](4_lockbox/lockbox_results.md) | The success criteria fixed in advance, Rank IC, and portfolios on the lockbox, with the frozen hyperparameters |
 | [lockbox_equity.png](4_lockbox/lockbox_equity.png) | Cumulative net returns on the lockbox |
 | [lockbox_run.lock](4_lockbox/lockbox_run.lock) | Proof of the single run: time, git commit, and config hash; its presence blocks a second run |
 
@@ -56,5 +56,5 @@ The held-out year, 2025-10 to 2026-10, evaluated exactly once at the end.
 | File | What it shows |
 |---|---|
 | [exploratory_low_volatility.md](6_exploratory/exploratory_low_volatility.md) | The models against a one-line low-volatility rule, with beta-adjusted alpha |
-| [extension_features_xgboost.md](6_exploratory/extension_features_xgboost.md) | Four literature features and XGBoost, tested under rules registered before the code |
+| [extension_features_xgboost.md](6_exploratory/extension_features_xgboost.md) | Four literature features and XGBoost, tested under decision rules committed before the code |
 | [delisting_sensitivity.md](6_exploratory/delisting_sensitivity.md) | Rank IC with the 26 test labels lost to delistings put back (`vn-rank delisting`) |

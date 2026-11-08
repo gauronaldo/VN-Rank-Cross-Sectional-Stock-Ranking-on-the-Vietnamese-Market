@@ -28,7 +28,7 @@ rule chosen after it was opened, and it is now spent.
 
 ## 2. Four literature features and XGBoost
 
-Registered in [`protocol.md`](protocol.md) Section 12 before any code was written, then run
+Fixed in [`protocol.md`](protocol.md) Section 12 and committed before any code was written, then run
 once on the walk-forward blocks. The four features are rolling 60-day market beta,
 idiosyncratic volatility (`ivol_60`), the largest daily return of 20 days (`max_20`), and
 60-day skewness.

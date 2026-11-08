@@ -1,6 +1,6 @@
 """Exploratory analysis after the lockbox (I/O layer): low-volatility baselines.
 
-**Exploratory, not part of the pre-registered protocol.** The lockbox has been run, so
+**Exploratory, not part of the protocol locked before results.** The lockbox has been run, so
 nothing here may change the primary result. The question is whether LightGBM adds
 anything over a one-line low-volatility rule, the best-known effect in its features:
 

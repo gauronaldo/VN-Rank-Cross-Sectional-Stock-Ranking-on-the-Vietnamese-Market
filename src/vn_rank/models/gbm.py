@@ -1,4 +1,4 @@
-"""LightGBM ranking model, the pre-registered primary model.
+"""LightGBM ranking model, the primary model fixed in advance.
 
 L2 regression on the per-date rank of the forward return. Missing feature ranks stay
 NaN; LightGBM routes them natively. With a validation frame, training stops early on the

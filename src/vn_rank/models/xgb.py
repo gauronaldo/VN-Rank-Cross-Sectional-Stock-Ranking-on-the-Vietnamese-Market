@@ -21,7 +21,7 @@ from vn_rank.config import LightGBMConfig, SearchRange
 from vn_rank.models.base import TARGET_COLUMN, RankingModel
 from vn_rank.models.gbm import ROUNDS_KEY, GBMRun
 
-# Pre-registered search space (protocol Section 12), mirroring the LightGBM ranges.
+# Search space fixed in protocol Section 12, mirroring the LightGBM ranges.
 SEARCH_SPACE = {
     "max_leaves": SearchRange(low=8, high=128, log=True, integer=True),
     "min_child_weight": SearchRange(low=100, high=5000, log=True, integer=True),

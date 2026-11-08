@@ -1,6 +1,6 @@
 """Exploratory extension (I/O layer): literature features and XGBoost, protocol Section 12.
 
-Pre-registered before this code was written. Walk-forward only (the lockbox is spent):
+Fixed in protocol Section 12 before this code was written. Walk-forward only (the lockbox is spent):
 
 - four new price features (``beta_60``, ``ivol_60``, ``max_20``, ``skew_60``), ranked
   within each date among universe members like the original 15;
@@ -44,7 +44,7 @@ PRIMARY = runner.PRIMARY_MODEL  # run 1: the original LightGBM predictions (15 f
 EXPERIMENT_NAME = "extension"
 PREDICTIONS_FILE = "extension_predictions.parquet"
 REPORT_STEM = "extension_features_xgboost"
-# (name, run A, run B): the pre-registered paired difference is A minus B.
+# (name, run A, run B): the paired difference fixed in protocol Section 12 is A minus B.
 HYPOTHESES = (
     ("H1 features", "lightgbm_19", PRIMARY),
     ("H2 library", "xgboost_15", PRIMARY),
@@ -58,7 +58,7 @@ logger = logging.getLogger(__name__)
 def new_feature_frames(
     frames: builder.MarketFrames, market_close: pd.Series
 ) -> dict[str, pd.DataFrame]:
-    """The four pre-registered features as wide frames; each uses data up to ``t``."""
+    """The four features of protocol Section 12 as wide frames; each uses data up to ``t``."""
     beta, ivol = ind.rolling_market_moments(frames.close, market_close, MARKET_WINDOW)
     return {
         "beta_60": beta,
@@ -142,7 +142,7 @@ def feature_ic(samples: pd.DataFrame, keys: pd.DataFrame) -> pd.DataFrame:
 
 
 def extension(config: Config) -> int:
-    """Run the pre-registered extension once and write ``reports/extension_*.md``."""
+    """Run the extension of protocol Section 12 once and write its report."""
     lockbox = pd.Timestamp(config.validation.lockbox_start)
     prices, processed = pipeline.load_prices(config, lockbox), config.paths.processed_dir
     frames = builder.align_to_calendar(builder.repair_ohlc(prices.raw), prices.calendar)
