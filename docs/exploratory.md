@@ -28,50 +28,30 @@ rule chosen after it was opened, and it is now spent.
 
 ## 2. Four literature features and XGBoost
 
-Fixed in [`protocol.md`](protocol.md) Section 12 and committed before any code was written, then run
-once on the walk-forward blocks. The four features are rolling 60-day market beta,
-idiosyncratic volatility (`ivol_60`), the largest daily return of 20 days (`max_20`), and
-60-day skewness.
-
-| Test (paired mean Rank IC, A minus B) | Difference [95% CI] | Result |
-|---|---|---|
-| H1: LightGBM 19 features minus LightGBM 15 | +0.010 [+0.003, +0.017] | features help (IC 0.058 to 0.068) |
-| H2: XGBoost 15 minus LightGBM 15 | +0.000 [-0.004, +0.004] | the library does not matter |
-| H3: LightGBM 19 minus the low-volatility rule | +0.013 [-0.014, +0.048] | still no significant edge over the rule |
-
-Descriptive only: a one-line idiosyncratic-volatility rule reaches Rank IC 0.071, with net
-excess +10.2% a year over equal weight and alpha after beta +6.7% [-1.6, +14.4] (beta
-0.44, turnover 6 times a year). The extended LightGBM still loses to equal weight after
-costs (-3.0% a year). The features were chosen after earlier analyses had shown that
-volatility drives the signal, so H1 may be slightly optimistic.
-[Report](../reports/6_exploratory/extension_features_xgboost.md).
+Three tests were fixed in [`protocol.md`](protocol.md) Section 12 and committed before any
+code, then run once on the walk-forward blocks. Adding four features from the anomaly
+literature (60-day beta, idiosyncratic volatility, the largest daily return of 20 days, and
+60-day skewness) raises LightGBM's Rank IC from 0.058 to 0.068 (+0.010 [+0.003, +0.017]),
+but the features were chosen after volatility was known to drive the signal, so the gain
+may be optimistic, and the extended model is still not significantly better than the
+low-volatility rule (+0.013 [-0.014, +0.048]) and still loses to equal weight after costs.
+Swapping LightGBM for XGBoost makes no difference (+0.000 [-0.004, +0.004]). A one-line idiosyncratic-
+volatility rule, reported descriptively, had alpha after beta +6.7% [-1.6, +14.4] a year.
+The code was removed for scope; the git tag `exploratory-extension` marks the last commit
+that has it, and the [report](../reports/6_exploratory/extension_features_xgboost.md) is kept.
 
 ## 3. Labels lost to delisting
 
-**Concern:** a label is missing when the stock stops trading before the exit session
-(protocol Section 3). A stock delisted during the 5-session hold then drops out of the
-evaluation, and a model is never penalized for ranking it high. This could flatter Rank IC.
+A label is missing when the stock stops trading before the exit session, so on the 925
+test dates 26 universe rows (5 symbols, 0.009%) drop out of the evaluation. Putting them
+back, at their last close or at -100%, changes mean Rank IC by at most 0.0003 for every
+model, even when the learned models are assumed to rank them first (their fold models were
+not saved).
 
-**Check:** on the 925 test dates only **26** universe rows lose their label this way (5
-symbols, 20 dates, 0.009% of the 303,736 scored rows). Putting them back with the return to
-their last close, or with a -100% return, changes mean Rank IC by **at most 0.0003** for
-every model. For the learned models this already assumes the worst case (the lost stock
-gets the highest score on its date), because the fold models were not saved.
-
-**The portfolio has the same gap, and there it is a look-ahead.** The backtest chooses only
-among stocks whose label exists, so it never buys a stock that will stop trading inside the
-hold, which no investor could know in advance. Rerunning it with the lost rows eligible
-touches 4 rows on rebalance dates (4 symbols); the learned model is made to buy all of them:
-
-| Net excess vs equal weight, % a year | Reported | Carried at last close | Lost after last close (-100%) |
-|---|---|---|---|
-| LightGBM (worst case: always buys them) | -6.4 | -6.6 | -9.4 |
-| Low-volatility rule (real scores) | +5.8 | +5.8 | +6.2 |
-
-The equal-weight benchmark moves by at most 0.3 points a year. From entry to their last
-close these stocks lost at worst 1% to 25% each, so the last-close column is the realistic
-one and the -100% column a bound. Either way the conclusion is unchanged: LightGBM
-already loses to equal weight after costs, and the look-ahead flattered it by at most about
-3 points a year. The check covers only symbols in the snapshot; the 25 delisted symbols the
-source cannot serve and older delistings are absent (see the README limitations).
+The backtest has the same gap, and there it is a **small look-ahead**: it chooses only among
+stocks whose label exists, so it never buys a stock about to stop trading. Made to buy the
+4 such rows on rebalance dates, LightGBM's net excess return over equal weight moves from
+-6.4% to **-6.6%** a year if they are carried at their last close (each lost at worst 1% to 25%) and
+to **-9.4%** if they are a total loss, a bound. The conclusion does not change. Symbols the
+source cannot serve (25) and older delistings are not covered.
 [Report](../reports/6_exploratory/delisting_sensitivity.md).

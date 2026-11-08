@@ -331,6 +331,9 @@ costs. It is labelled exploratory everywhere.
 
 ## Exploratory extension: literature features and XGBoost (2026-11-08)
 
+*The code below was removed later the same day for scope (protocol changelog); the git tag
+`exploratory-extension` marks the last commit that has it.*
+
 Registered in protocol Section 12 (commit `2c12260`) before any code; implemented in
 `ff3d4ff` and run once. The four features come from the anomaly literature on volatility
 and lottery-like stocks: rolling beta and residual (idiosyncratic) volatility against

@@ -4,7 +4,7 @@ UV := uv run
 
 .PHONY: help setup check lint format typecheck test validate-config \
         download validate-data features train backtest ablation lockbox update \
-        exploratory extension delisting
+        exploratory delisting
 
 help:  ## List targets
 	@grep -E '^[a-z-]+:.*## ' $(MAKEFILE_LIST) | awk -F':.*## ' '{printf "  %-16s %s\n", $$1, $$2}'
@@ -58,9 +58,6 @@ update:  ## Score the newest session with the frozen model; track realized Rank 
 
 exploratory:  ## Post-lockbox low-volatility comparison (exploratory, changes no result)
 	$(UV) vn-rank --config $(CONFIG) exploratory
-
-extension:  ## Exploratory extension fixed in protocol Section 12: literature features and XGBoost
-	$(UV) vn-rank --config $(CONFIG) extension
 
 delisting:  ## Exploratory: Rank IC with labels lost to delisting put back
 	$(UV) vn-rank --config $(CONFIG) delisting

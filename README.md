@@ -2,9 +2,6 @@
 
 [![check](https://github.com/gauronaldo/VN-Rank-Cross-Sectional-Stock-Ranking-on-the-Vietnamese-Market/actions/workflows/check.yml/badge.svg)](https://github.com/gauronaldo/VN-Rank-Cross-Sectional-Stock-Ranking-on-the-Vietnamese-Market/actions/workflows/check.yml)
 ![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
-[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
-[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
-[![mypy strict](https://img.shields.io/badge/mypy-strict-2A6DB2)](https://mypy.readthedocs.io/en/stable/command_line.html#cmdoption-mypy-strict)
 [![protocol locked before results](https://img.shields.io/badge/protocol-locked%20before%20results-8A2BE2)](docs/protocol.md)
 [![lockbox: fixed models run once](https://img.shields.io/badge/lockbox-fixed%20models%20run%20once-555555)](reports/4_lockbox/lockbox_run.lock)
 
@@ -75,7 +72,7 @@ walk-forward half-years, then run once on the held-out year.
   with limit-up/limit-down and liquidity constraints.
 
 The criteria, models, and metrics were fixed before any result
-([`docs/protocol.md`](docs/protocol.md), with a dated changelog). The protocol was
+([`docs/protocol.md`](docs/protocol.md), with a [dated changelog](docs/protocol_changelog.md)). The protocol was
 committed to this repository, not registered with an outside service, so the git history
 is its only timestamp; the reason for every
 choice is in [`docs/design_notes.md`](docs/design_notes.md).
@@ -118,15 +115,12 @@ significant); Rank IC falls from 0.070 to 0.045 as the liquidity threshold rises
 to 5 billion VND; net excess return breaks even near 0.15% fee plus slippage per side.
 
 **After the lockbox** ([exploratory analyses](docs/exploratory.md)): four features from
-the anomaly literature raise Rank IC to 0.068, XGBoost changes nothing, and neither beats
-the low-volatility rule significantly. Putting back the 26 test labels lost to delistings
+the anomaly literature raise Rank IC to 0.068 but do not beat the low-volatility rule
+significantly, and XGBoost makes no difference. Putting back the 26 test labels lost to delistings
 changes Rank IC by at most 0.0003 and LightGBM's net excess return by 0.1 to 3 points a
 year (see the limitations).
 
-Detailed reports, one folder per stage ([index](reports/README.md)):
-[data](reports/1_data/) · [walk-forward](reports/2_walk_forward/) ·
-[ablation and SHAP](reports/3_ablation/) · [lockbox](reports/4_lockbox/) ·
-[monitoring](reports/5_monitoring/) · [exploratory](reports/6_exploratory/)
+Every table and figure, one folder per stage: [reports index](reports/README.md).
 
 ## Metric definitions
 
@@ -166,7 +160,7 @@ make train      # walk-forward tuning and scoring of 5 models, about 40 minutes
 make backtest   # portfolio backtest, about 1 minute
 make ablation   # feature groups, sensitivity, SHAP, about 25 minutes
 make update     # score the newest session with the frozen model
-make exploratory extension delisting   # post-lockbox checks (docs/exploratory.md)
+make exploratory delisting   # post-lockbox checks (docs/exploratory.md)
 ```
 
 **Data snapshot:** downloaded 2026-11-07 with vnstock 5.2.2 (source `vci`), sessions
@@ -186,7 +180,7 @@ downloader. On Windows without `make`, run `uv run vn-rank <command>`.
 configs/default.yaml   every tunable value
 src/vn_rank/           data, features, validation, models, evaluation, backtest, monitoring
 tests/                 includes look-ahead, purge, and cost-accounting tests
-docs/                  protocol.md (locked before results), design_notes.md, exploratory.md
+docs/                  protocol.md (locked before results) and its changelog, design_notes.md, exploratory.md
 notebooks/01_eda.ipynb universe size, missing values, feature distributions and correlations
 reports/               every table and figure, one folder per stage (see reports/README.md)
 ```
