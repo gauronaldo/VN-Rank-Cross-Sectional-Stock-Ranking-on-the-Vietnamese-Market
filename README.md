@@ -129,7 +129,7 @@ Detailed reports: [signal](reports/signal_results.md) ·
 
 ```bash
 make setup      # pinned dependencies (uv) and git hooks
-make check      # ruff, mypy --strict, pytest (198 tests; also run in CI)
+make check      # ruff, mypy --strict, pytest (207 tests; also run in CI)
 make download   # vnstock snapshot (free Community API key)
 make features   # development panel, about 1 minute
 make train      # walk-forward tuning and scoring of 5 models, about 40 minutes
@@ -147,7 +147,7 @@ downloader. On Windows without `make`, run `uv run vn-rank <command>`.
 ```
 configs/default.yaml   every tunable value
 src/vn_rank/           data, features, validation, models, evaluation, backtest, monitoring
-tests/                 look-ahead, purge, and cost-accounting tests among 198
+tests/                 look-ahead, purge, and cost-accounting tests among 207
 docs/                  protocol.md (pre-registered), design_notes.md
 reports/               every table and figure referenced above
 ```
