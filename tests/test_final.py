@@ -21,6 +21,7 @@ from vn_rank.cli import main
 from vn_rank.config import config_from_dict, config_to_dict, load_config
 from vn_rank.data import storage
 from vn_rank.monitoring import update as monitor
+from vn_rank.utils import report_paths
 
 SESSIONS = pd.bdate_range("2019-01-01", "2021-12-31")
 N_SYMBOLS = 60
@@ -120,7 +121,8 @@ def test_train_lockbox_update_end_to_end(
     assert (live / f"top_list_{SESSIONS[-1].date()}.csv").exists()
     log = storage.read_parquet(live / final.SCORES_LOG)
     assert log["date"].max() == SESSIONS[-1]
-    assert (live / final.REALIZED_FIGURE).exists()
+    monitoring = report_paths.section(config.paths.reports_dir, report_paths.MONITORING)
+    assert (monitoring / final.REALIZED_FIGURE).exists()
 
 
 def test_lockbox_split_purges_against_the_lockbox_start(config_path: Path) -> None:

@@ -278,7 +278,8 @@ def update(config: Config, fetch: bool) -> int:
     ic = monitor.realized_ic(log, panel)
     references = _reference_ics(config)
     figure = monitor.plot_realized_ic(ic, references, ROLLING_WINDOW)
-    storage.save_figure(figure, live_dir(config) / REALIZED_FIGURE, config.project.figure_dpi)
+    monitoring = report_paths.section(config.paths.reports_dir, report_paths.MONITORING)
+    storage.save_figure(figure, monitoring / REALIZED_FIGURE, config.project.figure_dpi)
     logger.info(
         "Buy list for the close after %s (%d stocks):\n%s",
         newest.date(),
