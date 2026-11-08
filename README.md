@@ -11,32 +11,34 @@
 > 1. **Ranking:** does the model's ranking match next week's actual ranking? **Yes.**
 > 2. **Profit:** does buying the top-ranked stocks beat buying all of them, after costs? **Not shown.**
 
+| At a glance | |
+|---|---|
+| **Data** | Daily prices and volume of 1,720 stocks (239 delisted ones included), 2018–2026; about 320 liquid stocks a day |
+| **Method** | 15 hand-written price–volume indicators → Elastic Net, LightGBM, and an MLP, against one-line rules; 8 walk-forward half-years, then one held-out year |
+| **Result** | The ranking works (Rank IC 0.058, 95% CI 0.042–0.076); a profit after costs is not shown |
+| **Rigor** | Protocol locked before results, purge and embargo, held-out year evaluated once for the fixed models, block-bootstrap intervals, look-ahead tests |
+
+The value of the project is the testing, not a trading strategy: the answer on profit is
+negative, but it was reached under rules fixed in advance, with no look-ahead and no tuning
+on test data, so it can be trusted.
+
 ## The answer
 
-- **The ranking is real.** The primary model fixed in advance, LightGBM, has a mean Rank IC
-  of **0.058** on 3.75 years of walk-forward tests (95% CI 0.042 to 0.076, positive in 8 of
-  8 folds) and **0.100** on a held-out year evaluated once (CI 0.082 to 0.113). Both
-  success criteria fixed in advance hold.
-
-  *Rank IC* is the daily correlation between the model's ranking and the ranking of
-  realized returns: 0 is a coin flip, 1 is perfect, and values of 0.02 to 0.05 are usually
-  considered useful for equity signals. *Walk-forward* means the model is retrained on the
-  past and tested on the next half-year, eight times in a row; the *held-out year* (the
-  lockbox) was not touched until every choice was frozen.
+- **The ranking is real.** LightGBM, the primary model fixed in advance, has a mean Rank IC
+  of **0.058** on 3.75 years of walk-forward tests (positive in 8 of 8 folds) and **0.100**
+  on the held-out year (CI 0.082 to 0.113). Both success criteria fixed in advance hold.
+  *Rank IC is the daily correlation between predicted and realized ranks (0 = chance; 0.02
+  to 0.05 is typically useful).*
 - **It is mostly the low-volatility effect.** A one-line rule (rank stocks by minus their
   60-day volatility) reaches 0.055. The models are steadier than the rule, not stronger.
 - **A profit after costs is not shown.** Before costs the top decile beats the equal-weight
-  portfolio by about 12% a year, but the ranking changes fast: about 65% of the portfolio is
-  replaced every week and costs take about 20% a year. No strategy has an alpha after costs
-  and beta that is significantly above zero (the low-volatility rule's estimate is +1.8% a
-  year, but its interval includes 0). The ranking is best at spotting losers, which a
-  long-only portfolio (no short selling in Vietnam) cannot use.
+  portfolio by about 12% a year, but about 65% of the portfolio is replaced every week and
+  costs take about 20% a year. No strategy has an alpha after costs and beta that is
+  significantly above zero (the low-volatility rule's +1.8% a year has an interval that
+  includes 0). The ranking is best at spotting losers, which a long-only
+  portfolio (no short selling in Vietnam) cannot use.
 
 ![Rank IC by model and period, and the walk-forward cost story](reports/summary.png)
-
-The value of the project is the protocol that makes this answer trustworthy: no look-ahead,
-no tuning on test data, and a held-out year on which the models fixed in advance were
-evaluated exactly once.
 
 ## Method
 
@@ -79,59 +81,32 @@ choice is in [`docs/design_notes.md`](docs/design_notes.md).
 
 ## Results
 
-**Signal (walk-forward, 925 test dates).**
+| Walk-forward, 2022-01 → 2025-09 | Mean Rank IC [95% CI] | Net excess over equal weight, % a year [95% CI] |
+|---|---|---|
+| **LightGBM** (primary) | **0.058 [0.042, 0.076]** | -6.4 [-19.1, +7.8] |
+| Low-volatility rule* | 0.055 [0.015, 0.088] | +5.8 [-18.5, +27.1] |
+| Momentum (20 d) baseline | -0.001 [-0.023, 0.026] | -4.8 [-19.6, +11.7] |
+| Reversal (5 d) baseline | 0.005 [-0.015, 0.023] | -53.4 [-67.6, -39.9] |
 
-| Model | Mean Rank IC [95% CI] | Folds > 0 | LightGBM minus model [95% CI] |
-|---|---|---|---|
-| Momentum (20 d) | -0.001 [-0.023, 0.026] | 4 / 8 | 0.059 [0.034, 0.080] |
-| Reversal (5 d) | 0.005 [-0.015, 0.023] | 5 / 8 | 0.054 [0.027, 0.084] |
-| Elastic Net | 0.040 [0.011, 0.069] | 6 / 8 | 0.018 [-0.001, 0.040] |
-| **LightGBM** (primary) | **0.058 [0.042, 0.076]** | **8 / 8** | — |
-| MLP | 0.057 [0.040, 0.075] | 8 / 8 | 0.002 [-0.006, 0.010] |
-| Low-volatility rule* | 0.055 [0.015, 0.088] | 7 / 8 | 0.003 [-0.020, 0.034] |
-
-**Portfolio (walk-forward, % per year, net of costs unless stated).**
-
-| Strategy | Turnover | Cost | Excess vs equal weight, before costs | Excess vs equal weight [95% CI] | Beta | Alpha after beta [95% CI] |
-|---|---|---|---|---|---|---|
-| LightGBM top decile | 33x | 19.9 | +12.3 | -6.4 [-19.1, +7.8] | 0.83 | -7.5 [-17.3, +4.5] |
-| LightGBM, turnover band* | 25x | 14.8 | +12.2 | -1.5 [-14.2, +12.9] | 0.82 | -2.7 [-12.5, +9.4] |
-| Low-volatility rule* | 5x | 3.3 | +8.0 | +5.8 [-18.5, +27.1] | 0.35 | +1.8 [-7.9, +10.2] |
+MLP (0.057) matches LightGBM and Elastic Net (0.040) trails it. All models, turnover,
+costs, beta, and alpha are in the [full tables](reports/README.md#headline-tables), with
+the [metric definitions](reports/README.md#metric-definitions).
 
 **Lockbox (2025-10 → 2026-10).** LightGBM 0.100, Elastic Net 0.102, MLP 0.089,
-baselines about 0 (the low-volatility rule*, scored there afterwards, 0.091). Before reporting, the high value was checked
-for leakage: the rebuilt panel matches the development panel exactly, the ATR rank alone
-(past prices only) reaches -0.104, and Rank IC is positive in all 13 months. The year
-favoured low-volatility stocks (the equal-weight portfolio lost about 22% a year while
-VNINDEX gained about 5% a year), so the walk-forward 0.058 is the more representative
-estimate.
+baselines about 0 (the low-volatility rule*, scored there afterwards, 0.091). Before
+reporting, the high value was checked for leakage: the rebuilt panel matches the
+development panel exactly, the ATR rank alone (past prices only) reaches -0.104, and Rank
+IC is positive in all 13 months. The year favoured low-volatility stocks (the equal-weight
+portfolio lost about 22% a year while VNINDEX gained about 5% a year), so the walk-forward
+0.058 is the more representative estimate.
 
-\*Added after seeing results and labelled as such: the turnover band (keep holdings while
-in the top 20%) after the walk-forward backtest, and the low-volatility rule after the
-lockbox. Neither changes a result fixed in advance.
-
-**Also tested:** dropping any one feature group changes Rank IC by at most 0.005 (not
-significant); Rank IC falls from 0.070 to 0.045 as the liquidity threshold rises from 0.5
-to 5 billion VND; net excess return breaks even near 0.15% fee plus slippage per side.
+\*Added after the lockbox and labelled exploratory; it changes no result fixed in advance.
 
 **After the lockbox** ([exploratory analyses](docs/exploratory.md)): four features from
 the anomaly literature raise Rank IC to 0.068 but do not beat the low-volatility rule
 significantly, and XGBoost makes no difference. Putting back the 26 test labels lost to delistings
 changes Rank IC by at most 0.0003 and LightGBM's net excess return by 0.1 to 3 points a
 year (see the limitations).
-
-Every table and figure, one folder per stage: [reports index](reports/README.md).
-
-## Metric definitions
-
-- **Rank IC:** on one day, the Spearman correlation between model scores and realized 5-day
-  returns across the stocks; a day with identical scores counts as 0. IC IR (mean / std of
-  the daily series) is per day, not annualized.
-- **Intervals:** 95% moving-block bootstrap (20-day blocks, 10,000 resamples) of daily
-  series; paired for differences. Newey-West t-statistics use lag 4 for overlapping labels.
-- **Returns:** daily net returns, annualized as mean × 252; Sharpe uses a 0% risk-free
-  rate. Turnover is one-way per rebalance, annualized. Alpha and beta come from regressing
-  daily returns on the equal-weight benchmark.
 
 ## Limitations
 
