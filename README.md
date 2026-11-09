@@ -1,9 +1,6 @@
 # VN-Rank: cross-sectional stock ranking on the Vietnamese market
 
 [![check](https://github.com/gauronaldo/VN-Rank-Cross-Sectional-Stock-Ranking-on-the-Vietnamese-Market/actions/workflows/check.yml/badge.svg)](https://github.com/gauronaldo/VN-Rank-Cross-Sectional-Stock-Ranking-on-the-Vietnamese-Market/actions/workflows/check.yml)
-![Python 3.11](https://img.shields.io/badge/python-3.11-3776AB?logo=python&logoColor=white)
-[![protocol locked before results](https://img.shields.io/badge/protocol-locked%20before%20results-8A2BE2)](docs/protocol.md)
-[![lockbox: fixed models run once](https://img.shields.io/badge/lockbox-fixed%20models%20run%20once-555555)](reports/4_lockbox/lockbox_run.lock)
 
 > **Can past prices and trading volume tell which Vietnamese stocks will do better over the
 > next week, and is that enough to make money after trading costs?**
